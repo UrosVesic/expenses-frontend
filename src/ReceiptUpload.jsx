@@ -2,22 +2,16 @@ import { useRef, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import {
+  requestUploadUrl,
+  uploadToS3,
+  requestDownloadUrl,
+} from "./api.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-const UPLOAD_URL =
-  "https://w7mca3haxa.execute-api.eu-central-1.amazonaws.com/prod";
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-async function pdfToImageDataUrl(file) {
+// Renders the first page of a PDF to a PNG blob (OCR works on images only).
+async function pdfToImageBlob(file) {
   const buffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
   const page = await pdf.getPage(1);
@@ -32,7 +26,12 @@ async function pdfToImageDataUrl(file) {
     viewport,
   }).promise;
 
-  return canvas.toDataURL("image/png");
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("PDF conversion failed"))),
+      "image/png",
+    ),
+  );
 }
 
 export default function ReceiptUpload() {
@@ -40,34 +39,28 @@ export default function ReceiptUpload() {
   const inputRef = useRef(null);
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
+  // files uploaded in this session: { fileId: "<uuid>.<ext>", name: "original name" }
+  const [uploads, setUploads] = useState([]);
+
+  const idToken = auth.user?.id_token;
 
   const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
+    const picked = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
+    if (!picked) return;
 
     setStatus("uploading");
     setError(null);
 
     try {
-      const image =
-        file.type === "application/pdf"
-          ? await pdfToImageDataUrl(file)
-          : await fileToDataUrl(file);
+      const isPdf = picked.type === "application/pdf";
+      const body = isPdf ? await pdfToImageBlob(picked) : picked;
+      const contentType = isPdf ? "image/png" : picked.type;
 
-      const res = await fetch(UPLOAD_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${auth.user?.id_token}`,
-        },
-        body: JSON.stringify({ image }),
-      });
+      const { url, fileId, headers } = await requestUploadUrl(idToken, contentType);
+      await uploadToS3(url, body, contentType, headers);
 
-      if (!res.ok) {
-        throw new Error(`Upload failed with status ${res.status}`);
-      }
-
+      setUploads((prev) => [{ fileId, name: picked.name }, ...prev]);
       setStatus("success");
     } catch (err) {
       setStatus("error");
@@ -75,26 +68,53 @@ export default function ReceiptUpload() {
     }
   };
 
+  const handleDownload = async (fileId) => {
+    setError(null);
+    try {
+      const { url } = await requestDownloadUrl(idToken, fileId);
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.click();
+    } catch (err) {
+      setStatus("error");
+      setError(err.message);
+    }
+  };
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div className="flex items-center gap-2">
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,application/pdf"
+        accept="image/jpeg,image/png,application/pdf"
         onChange={handleFileChange}
-        style={{ display: "none" }}
+        className="hidden"
       />
       <button
+        type="button"
         onClick={() => inputRef.current?.click()}
         disabled={status === "uploading"}
+        className="h-9 px-4 inline-flex items-center gap-2 text-sm font-medium rounded-md bg-zinc-900 text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
       >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />
+        </svg>
         {status === "uploading" ? "Uploading…" : "Upload receipt"}
       </button>
-      {status === "success" && (
-        <span style={{ color: "#2fb344", fontSize: 14 }}>Uploaded ✓</span>
+      {status === "success" && uploads[0] && (
+        <button
+          type="button"
+          onClick={() => handleDownload(uploads[0].fileId)}
+          title={`Open ${uploads[0].name}`}
+          className="text-sm text-emerald-700 dark:text-emerald-400 hover:underline"
+        >
+          Uploaded
+        </button>
       )}
       {status === "error" && (
-        <span style={{ color: "#ff3b3b", fontSize: 14 }}>{error}</span>
+        <span className="text-sm text-red-600 dark:text-red-400" title={error}>Upload failed</span>
       )}
     </div>
   );
