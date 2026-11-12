@@ -18,7 +18,7 @@ export default function GroupList({ data, selected, onPick, maxHeightClass = "ma
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={`Search ${data.length} entries…`}
-          className="w-full mb-3 px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 focus:ring-2 focus:ring-zinc-400 focus:border-transparent"
+          className="w-full mb-3 px-3 py-2 text-base sm:text-sm border border-zinc-300 dark:border-zinc-600 rounded-xl bg-white dark:bg-zinc-700 focus:ring-2 focus:ring-zinc-400 focus:border-transparent"
         />
       )}
       <ul className={`${maxHeightClass} overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-700`}>
@@ -27,7 +27,7 @@ export default function GroupList({ data, selected, onPick, maxHeightClass = "ma
             <button
               type="button"
               onClick={() => onPick(g.group)}
-              className={`w-full flex items-center justify-between gap-3 px-2 py-2 text-left text-sm rounded transition-colors duration-150 hover:bg-zinc-50 dark:hover:bg-zinc-700 ${
+              className={`w-full flex items-center justify-between gap-3 px-2 py-3 lg:py-2 text-left text-sm rounded-lg transition-colors duration-150 hover:bg-zinc-50 dark:hover:bg-zinc-700 ${
                 selected === g.group ? "bg-zinc-100 dark:bg-zinc-800" : ""
               }`}
             >

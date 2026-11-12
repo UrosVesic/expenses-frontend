@@ -29,16 +29,17 @@ export default function GroupDoughnutChart({
   loading,
   selected,
   onSliceClick,
+  className = "",
 }) {
   const grouped = data.length > 0 ? groupSmallSlices(data) : [];
   // labels come from the API; the raw group is the key used for clicks
   const labelOf = (group) => grouped.find((g) => g.group === group)?.label ?? group;
 
   return (
-    <section className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-      <h2 className="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/30 rounded-t-lg text-sm font-semibold">{title}</h2>
-      <div className="p-5">
-        <div className="relative h-80">
+    <section className={`rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm ${className}`}>
+      <h2 className="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 rounded-t-2xl text-sm font-semibold">{title}</h2>
+      <div className="p-4 sm:p-5">
+        <div className="relative h-72 sm:h-80">
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="animate-pulse w-56 h-56 rounded-full border-[36px] border-zinc-100 dark:border-zinc-800" />

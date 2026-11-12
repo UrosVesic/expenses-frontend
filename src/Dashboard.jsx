@@ -89,6 +89,7 @@ export default function Dashboard() {
     () => localStorage.getItem(MONTH_STORAGE_KEY) || currentApiMonth(0),
   );
   const [theme, setTheme] = useState(initialTheme);
+  const [tab, setTab] = useState("category"); // mobile only: which breakdown is shown
   const [categoryData, setCategoryData] = useState([]);
   const [issuerData, setIssuerData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -192,14 +193,19 @@ export default function Dashboard() {
         ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
         : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
     }`;
+  // below lg only the active tab's chart + receipts are shown; lg shows both side by side
+  const show = (key) => (tab === key ? "" : "hidden lg:block");
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+    <div className="min-h-dvh bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <Toast toast={toast} onDismiss={() => setToast(null)} />
 
-      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur sticky top-0 z-40">
+      <header className="sticky top-0 z-40 bg-zinc-100/85 dark:bg-zinc-950/85 lg:bg-white/80 lg:dark:bg-zinc-900/80 backdrop-blur border-b border-zinc-200/70 dark:border-zinc-800 pt-[env(safe-area-inset-top)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <span className="text-base font-semibold tracking-tight">Montra</span>
+          <span className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <span className="h-7 w-7 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 grid place-items-center text-sm font-bold">M</span>
+            Montra
+          </span>
 
           <div className="flex items-center gap-1 sm:gap-3">
             <span className="hidden sm:block text-sm text-zinc-500 dark:text-zinc-400 mr-1">
@@ -213,31 +219,35 @@ export default function Dashboard() {
                 localStorage.setItem(THEME_STORAGE_KEY, next);
               }}
               aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-              className="h-8 w-8 grid place-items-center rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800"
+              className="h-10 w-10 lg:h-8 lg:w-8 grid place-items-center rounded-full lg:rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800"
             >
               {theme === "dark" ? <MoonIcon /> : <SunIcon />}
             </button>
             <button
               type="button"
               onClick={() => auth.removeUser().then(signOutRedirect)}
-              className="h-8 px-3 text-sm rounded-md text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              aria-label="Sign out"
+              className="h-10 lg:h-8 min-w-10 px-0 sm:px-3 inline-flex items-center justify-center gap-2 text-sm rounded-full lg:rounded-md text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
-              Sign out
+              <SignOutIcon />
+              <span className="hidden sm:inline">Sign out</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 lg:pt-8 pb-[calc(10rem+env(safe-area-inset-bottom))] lg:pb-10">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-5 lg:mb-8">
+          <div className="hidden lg:block">
             <h1 className="text-2xl font-semibold tracking-tight">{monthLabel}</h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">Spending overview</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <MonthPicker value={month} onChange={changeMonth} />
-            <div className="inline-flex rounded-md border border-zinc-300 dark:border-zinc-700 overflow-hidden divide-x divide-zinc-300 dark:divide-zinc-700 bg-white dark:bg-zinc-900">
+            <div className="w-full sm:w-auto">
+              <MonthPicker value={month} onChange={changeMonth} />
+            </div>
+            <div className="hidden sm:inline-flex rounded-md border border-zinc-300 dark:border-zinc-700 overflow-hidden divide-x divide-zinc-300 dark:divide-zinc-700 bg-white dark:bg-zinc-900">
               <button type="button" onClick={() => changeMonth(currentApiMonth(0))} className={segment(isThisMonth)}>
                 This month
               </button>
@@ -245,8 +255,10 @@ export default function Dashboard() {
                 Last month
               </button>
             </div>
-            <QrScannerButton />
-            <ReceiptUpload />
+            <div className="hidden lg:flex items-center gap-2">
+              <QrScannerButton />
+              <ReceiptUpload onToast={setToast} />
+            </div>
           </div>
         </div>
 
@@ -255,20 +267,22 @@ export default function Dashboard() {
         )}
 
         {categoryData.length > 0 && (
-          <dl className="grid grid-cols-2 lg:grid-cols-4 gap-px mb-8 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-200 dark:bg-zinc-800">
-            <Stat label="Total spent" value={formatDin(totalExpenses)} />
-            <Stat
-              label="Top category"
-              value={topCategory ? (topCategory.label ?? topCategory.group) : "-"}
-              small
-            />
+          <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5 lg:mb-8">
+            <div className="col-span-2 rounded-2xl p-5 text-white bg-gradient-to-br from-zinc-800 to-zinc-950 dark:from-zinc-700 dark:to-zinc-900 shadow-sm min-w-0">
+              <dt className="text-xs font-medium text-zinc-300">Total spent</dt>
+              <dd className="mt-1 text-3xl font-semibold tracking-tight truncate">{formatDin(totalExpenses)}</dd>
+              <p className="mt-2 text-xs text-zinc-300 truncate">
+                Top category: <span className="font-medium text-white">{topCategory ? (topCategory.label ?? topCategory.group) : "-"}</span>
+              </p>
+            </div>
             <Stat label="Receipts" value={receiptStats.totalReceipts ?? "…"} />
             <Stat label="Average receipt" value={formatDin(receiptStats.avgPerReceipt)} />
           </dl>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-4 lg:mb-6">
           <GroupDoughnutChart
+            className={show("category")}
             title="By category"
             data={categoryData}
             loading={loading}
@@ -276,6 +290,7 @@ export default function Dashboard() {
             onSliceClick={category.select}
           />
           <GroupDoughnutChart
+            className={show("merchant")}
             title="By merchant"
             data={issuerData}
             loading={loading}
@@ -284,8 +299,8 @@ export default function Dashboard() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Panel title="Category receipts">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+          <Panel title="Category receipts" className={show("category")}>
             <ReceiptGroupDetails
               groupName={category.selected && (category.details?.label ?? labelOf(categoryData, category.selected))}
               details={category.details}
@@ -294,7 +309,7 @@ export default function Dashboard() {
               onReceiptUpdated={onReceiptUpdated}
             />
           </Panel>
-          <Panel title="Merchant receipts">
+          <Panel title="Merchant receipts" className={show("merchant")}>
             <ReceiptGroupDetails
               groupName={issuer.selected && (issuer.details?.label ?? labelOf(issuerData, issuer.selected))}
               details={issuer.details}
@@ -305,26 +320,61 @@ export default function Dashboard() {
           </Panel>
         </div>
       </main>
+
+      {/* mobile: floating actions + bottom tab bar (hidden on lg, where the header/toolbar has them) */}
+      <div className="lg:hidden fixed right-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-40 flex flex-col items-center gap-3">
+        <QrScannerButton variant="fab" />
+        <ReceiptUpload variant="fab" onToast={setToast} />
+      </div>
+      <nav
+        aria-label="Breakdown"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-2 border-t border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 backdrop-blur pb-[env(safe-area-inset-bottom)]"
+      >
+        <TabButton active={tab === "category"} onClick={() => setTab("category")} label="Categories">
+          <path d="M12 3v9h9A9 9 0 0 0 12 3zM10 5.1A9 9 0 1 0 18.9 14H10z" />
+        </TabButton>
+        <TabButton active={tab === "merchant"} onClick={() => setTab("merchant")} label="Merchants">
+          <path d="M3 9l1.5-5h15L21 9M3 9h18M3 9v11h18V9M9 20v-6h6v6" />
+        </TabButton>
+      </nav>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, label, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={`h-16 flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
+        active ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"
+      }`}
+    >
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.25 : 1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {children}
+      </svg>
+      {label}
+    </button>
   );
 }
 
 function Stat({ label, value, small }) {
   return (
-    <div className="bg-white dark:bg-zinc-900 px-5 py-4 min-w-0">
+    <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm px-4 py-3 sm:px-5 sm:py-4 min-w-0">
       <dt className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{label}</dt>
-      <dd className={`mt-1 font-semibold tracking-tight truncate ${small ? "text-lg leading-8" : "text-2xl"}`} title={String(value)}>
+      <dd className={`mt-1 font-semibold tracking-tight truncate ${small ? "text-lg leading-8" : "text-xl sm:text-2xl"}`} title={String(value)}>
         {value}
       </dd>
     </div>
   );
 }
 
-function Panel({ title, children }) {
+function Panel({ title, className = "", children }) {
   return (
-    <section className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-      <h2 className="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/30 rounded-t-lg text-sm font-semibold">{title}</h2>
-      <div className="p-5">{children}</div>
+    <section className={`rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm ${className}`}>
+      <h2 className="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 rounded-t-2xl text-sm font-semibold">{title}</h2>
+      <div className="p-4 sm:p-5">{children}</div>
     </section>
   );
 }
@@ -346,6 +396,14 @@ function SunIcon() {
     <svg {...iconProps}>
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function SignOutIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
     </svg>
   );
 }

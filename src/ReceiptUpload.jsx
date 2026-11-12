@@ -34,7 +34,7 @@ async function pdfToImageBlob(file) {
   );
 }
 
-export default function ReceiptUpload() {
+export default function ReceiptUpload({ variant = "button", onToast }) {
   const auth = useAuth();
   const inputRef = useRef(null);
   const [status, setStatus] = useState("idle");
@@ -62,9 +62,11 @@ export default function ReceiptUpload() {
 
       setUploads((prev) => [{ fileId, name: picked.name }, ...prev]);
       setStatus("success");
+      onToast?.({ message: "Receipt uploaded. It will appear shortly.", type: "success" });
     } catch (err) {
       setStatus("error");
       setError(err.message);
+      onToast?.({ message: "Upload failed. Please try again.", type: "error" });
     }
   };
 
@@ -82,6 +84,33 @@ export default function ReceiptUpload() {
       setError(err.message);
     }
   };
+
+  if (variant === "fab") {
+    return (
+      <>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,application/pdf"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={status === "uploading"}
+          aria-label="Upload receipt"
+          className={`h-14 w-14 grid place-items-center rounded-full shadow-lg shadow-zinc-900/20 bg-zinc-900 text-white active:scale-95 transition-transform dark:bg-zinc-100 dark:text-zinc-900 ${
+            status === "uploading" ? "animate-pulse" : ""
+          }`}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />
+          </svg>
+        </button>
+      </>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">

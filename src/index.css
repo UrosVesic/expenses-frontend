@@ -26,5 +26,16 @@
   body {
     margin: 0;
     font-variant-numeric: tabular-nums;
+    background: #f4f4f5; /* zinc-100: matches the app so overscroll/safe areas blend in */
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+
+  :root.dark body {
+    background: #09090b; /* zinc-950 */
+  }
+
+  button {
+    touch-action: manipulation;
   }
 }

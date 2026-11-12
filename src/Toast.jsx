@@ -18,7 +18,7 @@ export default function Toast({ toast, onDismiss }) {
 
   return (
     <div
-      className={`fixed bottom-4 right-4 z-50 px-4 py-3 text-sm rounded-md border shadow-md bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 ${
+      className={`fixed z-[60] left-4 right-4 bottom-[calc(9rem+env(safe-area-inset-bottom))] lg:left-auto lg:right-4 lg:bottom-4 px-4 py-3 text-sm rounded-xl border shadow-lg bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 ${
         TYPE_CLASSES[toast.type] || TYPE_CLASSES.info
       }`}
     >

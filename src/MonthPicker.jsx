@@ -12,7 +12,7 @@ function shiftMonth(apiMonth, delta) {
 }
 
 const arrow =
-  "h-9 w-9 grid place-items-center text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800";
+  "h-11 w-11 sm:h-9 sm:w-9 grid place-items-center text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800";
 
 const cell = (active, disabled) =>
   `h-8 rounded-md text-sm transition-colors ${
@@ -54,7 +54,7 @@ export default function MonthPicker({ value, onChange }) {
 
   return (
     <div ref={rootRef} className="relative">
-      <div className="inline-flex items-center rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
+      <div className="flex sm:inline-flex items-center rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
         <button type="button" className={arrow} onClick={() => onChange(shiftMonth(value, -1))} aria-label="Previous month">
           <Chevron d="M15 18l-6-6 6-6" />
         </button>
@@ -66,7 +66,7 @@ export default function MonthPicker({ value, onChange }) {
           }}
           aria-haspopup="dialog"
           aria-expanded={open}
-          className="h-9 w-28 text-sm font-medium border-x border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+          className="h-11 sm:h-9 flex-1 sm:flex-none sm:w-28 text-sm font-semibold border-x border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800"
         >
           {MONTHS[valueMonth - 1]} {valueYear}
         </button>
