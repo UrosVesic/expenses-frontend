@@ -101,3 +101,15 @@ export function importReceiptFromQr(idToken, verificationUrl) {
     body: JSON.stringify({ verificationUrl }),
   });
 }
+
+// Photo/document of a saved receipt. The API accepts these types only.
+export const ATTACHMENT_TYPES = ["image/jpeg", "image/png", "application/pdf"];
+
+// -> { uploadUrl, expiresAt }; PUT the file to uploadUrl with the same Content-Type.
+export function requestAttachmentUpload(idToken, receiptId, contentType) {
+  return fetchJson(`${API_BASE_URL}/receipts/${encodeURIComponent(receiptId)}/attachment`, idToken, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType }),
+  });
+}

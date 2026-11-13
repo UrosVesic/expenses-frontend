@@ -104,7 +104,7 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
 
   // phones: full-screen sheet (header / scrolling form / sticky save bar); lg: inline card as before
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-zinc-50 dark:bg-zinc-900 lg:static lg:z-auto lg:mt-4 lg:rounded-lg lg:bg-zinc-50 lg:dark:bg-zinc-700">
+    <div className="fixed inset-0 z-[55] flex flex-col bg-zinc-50 dark:bg-zinc-900 lg:static lg:z-auto lg:mt-4 lg:rounded-lg lg:bg-zinc-50 lg:dark:bg-zinc-700">
       <div className="lg:hidden shrink-0 flex items-center justify-between gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <h3 className="text-base font-semibold">Edit receipt</h3>
         {summary}
