@@ -41,7 +41,7 @@ export default function GroupDoughnutChart({
       <div className="p-4 sm:p-5">
         <div className="relative h-72 sm:h-80">
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="animate-pulse w-56 h-56 rounded-full border-[36px] border-zinc-100 dark:border-zinc-800" />
             </div>
           )}

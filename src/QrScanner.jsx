@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { importReceiptFromQr, isSufUrl } from "./api.js";
 
-// Scans a QR code with the camera, then calls the scanned URL directly from the browser with
-// `Accept: application/json` and shows the response. Nothing is sent to montra-api yet.
+// Scans a fiscal receipt QR code with the camera and sends its verification URL to montra-api
+// (POST /receipts), which fetches the SUF data server-side (the SUF host blocks browser CORS).
 // Camera access needs a secure context (https or localhost).
-export default function QrScannerButton({ variant = "button" }) {
+export default function QrScannerButton({ variant = "button", idToken, onToast, onImported }) {
   const [open, setOpen] = useState(false);
   if (variant === "fab") {
     return (
@@ -18,7 +19,7 @@ export default function QrScannerButton({ variant = "button" }) {
             <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10" />
           </svg>
         </button>
-        {open && <ScannerDialog onClose={() => setOpen(false)} />}
+        {open && <ScannerDialog idToken={idToken} onToast={onToast} onImported={onImported} onClose={() => setOpen(false)} />}
       </>
     );
   }
@@ -35,7 +36,7 @@ export default function QrScannerButton({ variant = "button" }) {
         </svg>
         Scan QR
       </button>
-      {open && <ScannerDialog onClose={() => setOpen(false)} />}
+      {open && <ScannerDialog idToken={idToken} onToast={onToast} onImported={onImported} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -49,33 +50,14 @@ const VIDEO_CONSTRAINTS = {
 };
 const SCAN_INTERVAL_MS = 150;
 
-// GET the scanned URL asking for JSON. A browser blocks the response (fetch throws a bare
-// TypeError, no status) unless the server sends Access-Control-Allow-Origin for our origin.
-async function fetchReceiptJson(url, signal) {
-  try {
-    const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
-    const text = await res.text();
-    let body = text;
-    try {
-      body = JSON.parse(text);
-    } catch {
-      // not JSON: keep the raw text so it can be inspected
-    }
-    return { ok: res.ok, status: res.status, contentType: res.headers.get("content-type"), body };
-  } catch (e) {
-    if (e?.name === "AbortError") throw e;
-    return { ok: false, status: null, error: "Request blocked or failed. Most likely CORS: the server does not allow this origin." };
-  }
-}
-
-function ScannerDialog({ onClose }) {
+function ScannerDialog({ idToken, onToast, onImported, onClose }) {
   const videoRef = useRef(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [mirrored, setMirrored] = useState(false);
   const [resolution, setResolution] = useState(null);
   const [scanKey, setScanKey] = useState(0); // bump to scan again
-  const [response, setResponse] = useState(null); // outcome of calling the scanned URL
+  const [importState, setImportState] = useState(null); // { status: "saving" | "done" | "error", ... }
 
   useEffect(() => {
     let cancelled = false;
@@ -150,17 +132,26 @@ function ScannerDialog({ onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const isUrl = result && /^https?:\/\//i.test(result);
-  const fetching = isUrl && !response; // response is cleared on "Scan again"
+  const isReceipt = result != null && isSufUrl(result);
+  const saving = isReceipt && !importState; // importState is cleared on "Scan again"
 
   useEffect(() => {
-    if (!isUrl) return;
-    const controller = new AbortController();
-    fetchReceiptJson(result, controller.signal)
-      .then(setResponse)
-      .catch(() => {}); // aborted
-    return () => controller.abort();
-  }, [result, isUrl]);
+    if (!isReceipt) return;
+    let cancelled = false;
+    importReceiptFromQr(idToken, result)
+      .then(({ receiptId, created }) => {
+        if (cancelled) return;
+        setImportState({ status: "done", receiptId, created });
+        onToast?.({ message: created ? "Receipt saved." : "This receipt was already saved.", type: "success" });
+        if (created) onImported?.(receiptId);
+      })
+      .catch((e) => !cancelled && setImportState({ status: "error", message: e?.message ?? String(e) }));
+    return () => {
+      cancelled = true;
+    };
+    // onToast/onImported are callbacks from the parent; only a new scan should re-import
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, isReceipt, idToken]);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/70 sm:p-4" onClick={onClose} role="dialog" aria-modal="true">
@@ -170,7 +161,7 @@ function ScannerDialog({ onClose }) {
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
           <h2 className="text-sm font-semibold">
-            Scan QR code <span className="ml-1 text-xs font-normal text-zinc-500">(test)</span>
+            Scan QR code
           </h2>
           <button type="button" onClick={onClose} aria-label="Close" className="h-7 w-7 grid place-items-center rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
             ✕
@@ -196,36 +187,32 @@ function ScannerDialog({ onClose }) {
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           {result && (
             <>
-              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Decoded</p>
-              <p className="text-sm break-all rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-2 font-mono">{result}</p>
-              {isUrl && fetching && <p className="text-sm text-zinc-500 dark:text-zinc-400">Fetching receipt data…</p>}
-              {response && (
+              {!isReceipt && (
                 <>
-                  <p className={`text-xs font-medium ${response.ok ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    Response{response.status ? ` ${response.status}` : ""}
-                    {response.contentType ? ` · ${response.contentType}` : ""}
-                  </p>
-                  <pre className="text-xs max-h-60 overflow-auto rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-2 font-mono whitespace-pre-wrap break-all">
-                    {response.error ?? (typeof response.body === "string" ? response.body : JSON.stringify(response.body, null, 2))}
-                  </pre>
+                  <p className="text-sm text-red-600 dark:text-red-400">This is not a fiscal receipt QR code (expected a link to {"suf.purs.gov.rs"}).</p>
+                  <p className="text-sm break-all rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 p-2 font-mono">{result}</p>
                 </>
               )}
+              {saving && <p className="text-sm text-zinc-500 dark:text-zinc-400">Saving receipt…</p>}
+              {importState?.status === "done" && (
+                <p className="text-sm text-green-700 dark:text-green-400">
+                  {importState.created ? "Receipt saved." : "This receipt was already saved."}
+                </p>
+              )}
+              {importState?.status === "error" && (
+                <p className="text-sm text-red-600 dark:text-red-400">Could not save the receipt: {importState.message}</p>
+              )}
               <div className="flex flex-wrap gap-2">
-                {isUrl && (
-                  <a href={result} target="_blank" rel="noopener noreferrer" className="h-8 px-3 inline-flex items-center text-sm rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
-                    Open link
-                  </a>
-                )}
                 <button type="button" onClick={() => navigator.clipboard?.writeText(result)} className="h-8 px-3 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800">
                   Copy
                 </button>
               </div>
             </>
           )}
-          {(result || error) && (
+          {(result || error) && !saving && (
             <button type="button" onClick={() => {
                 setResult(null);
-                setResponse(null);
+                setImportState(null);
                 setError(null);
                 setScanKey((k) => k + 1);
               }} className="text-sm text-zinc-600 dark:text-zinc-300 hover:underline">

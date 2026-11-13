@@ -104,6 +104,15 @@ export default function Dashboard() {
   const issuer = useGroupPanel("merchant", idToken, month, setToast);
 
   const requestId = useRef(0);
+  // below lg the receipts panel sits under the chart: scroll to it after a pick
+  const categoryPanelRef = useRef(null);
+  const issuerPanelRef = useRef(null);
+  const pickAndScroll = (panel, ref) => (...args) => {
+    panel.select(...args);
+    if (!window.matchMedia("(min-width: 1024px)").matches) {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
   // display name sent by the API; the raw group stays the key for requests
   const labelOf = (groups, group) => groups.find((g) => g.group === group)?.label ?? group;
   // bumped after a receipt is edited so the charts and stats reload
@@ -256,7 +265,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="hidden lg:flex items-center gap-2">
-              <QrScannerButton />
+              <QrScannerButton idToken={idToken} onToast={setToast} onImported={() => setReloadKey((k) => k + 1)} />
               <ReceiptUpload onToast={setToast} />
             </div>
           </div>
@@ -287,7 +296,7 @@ export default function Dashboard() {
             data={categoryData}
             loading={loading}
             selected={category.selected}
-            onSliceClick={category.select}
+            onSliceClick={pickAndScroll(category, categoryPanelRef)}
           />
           <GroupDoughnutChart
             className={show("merchant")}
@@ -295,12 +304,12 @@ export default function Dashboard() {
             data={issuerData}
             loading={loading}
             selected={issuer.selected}
-            onSliceClick={issuer.select}
+            onSliceClick={pickAndScroll(issuer, issuerPanelRef)}
           />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-          <Panel title="Category receipts" className={show("category")}>
+          <Panel ref={categoryPanelRef} title="Category receipts" className={show("category")}>
             <ReceiptGroupDetails
               groupName={category.selected && (category.details?.label ?? labelOf(categoryData, category.selected))}
               details={category.details}
@@ -309,7 +318,7 @@ export default function Dashboard() {
               onReceiptUpdated={onReceiptUpdated}
             />
           </Panel>
-          <Panel title="Merchant receipts" className={show("merchant")}>
+          <Panel ref={issuerPanelRef} title="Merchant receipts" className={show("merchant")}>
             <ReceiptGroupDetails
               groupName={issuer.selected && (issuer.details?.label ?? labelOf(issuerData, issuer.selected))}
               details={issuer.details}
@@ -323,12 +332,12 @@ export default function Dashboard() {
 
       {/* mobile: floating actions + bottom tab bar (hidden on lg, where the header/toolbar has them) */}
       <div className="lg:hidden fixed right-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-40 flex flex-col items-center gap-3">
-        <QrScannerButton variant="fab" />
+        <QrScannerButton variant="fab" idToken={idToken} onToast={setToast} onImported={() => setReloadKey((k) => k + 1)} />
         <ReceiptUpload variant="fab" onToast={setToast} />
       </div>
       <nav
         aria-label="Breakdown"
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-2 border-t border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 backdrop-blur pb-[env(safe-area-inset-bottom)]"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-50 grid grid-cols-2 border-t border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 backdrop-blur pb-[env(safe-area-inset-bottom)]"
       >
         <TabButton active={tab === "category"} onClick={() => setTab("category")} label="Categories">
           <path d="M12 3v9h9A9 9 0 0 0 12 3zM10 5.1A9 9 0 1 0 18.9 14H10z" />
@@ -370,9 +379,10 @@ function Stat({ label, value, small }) {
   );
 }
 
-function Panel({ title, className = "", children }) {
+function Panel({ ref, title, className = "", children }) {
   return (
-    <section className={`rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm ${className}`}>
+    // scroll-mt keeps the title clear of the sticky header when scrolled into view
+    <section ref={ref} className={`scroll-mt-[calc(4rem+env(safe-area-inset-top))] rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm ${className}`}>
       <h2 className="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 rounded-t-2xl text-sm font-semibold">{title}</h2>
       <div className="p-4 sm:p-5">{children}</div>
     </section>

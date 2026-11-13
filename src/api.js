@@ -79,3 +79,25 @@ export function updateReceipt(idToken, receiptId, { totalAmount, items }) {
     body: JSON.stringify({ totalAmount, items }),
   });
 }
+
+// Fiscal receipt QR codes point here; montra-api enforces the same allow-list.
+export const SUF_HOST = "suf.purs.gov.rs";
+
+export function isSufUrl(text) {
+  try {
+    const u = new URL(text);
+    return u.protocol === "https:" && u.hostname === SUF_HOST;
+  } catch {
+    return false;
+  }
+}
+
+// Import a receipt from its scanned QR URL; montra-api fetches the SUF data server-side.
+// -> { receiptId, created } (created = false when this invoice was already saved)
+export function importReceiptFromQr(idToken, verificationUrl) {
+  return fetchJson(`${API_BASE_URL}/receipts`, idToken, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ verificationUrl }),
+  });
+}

@@ -10,7 +10,9 @@ const cognitoAuthConfig = {
   authority:
     "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_tYEzhz734",
   client_id: "35kq5tpku3bkv6l9rkg05v2dde",
-  redirect_uri: "http://localhost:5173/auth",
+  // current origin, so the same build works on localhost and on CloudFront
+  // (each origin must be listed in the app client's callback URLs)
+  redirect_uri: `${window.location.origin}/auth`,
   response_type: "code",
   scope: "phone openid email profile",
 };
