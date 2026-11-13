@@ -3,7 +3,6 @@ import {
   Pie,
   Cell,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import { formatDin } from "./api.js";
@@ -34,12 +33,20 @@ export default function GroupDoughnutChart({
   const grouped = data.length > 0 ? groupSmallSlices(data) : [];
   // labels come from the API; the raw group is the key used for clicks
   const labelOf = (group) => grouped.find((g) => g.group === group)?.label ?? group;
+  const total = data.reduce((sum, g) => sum + g.totalAmount, 0);
+  // list rows reuse the slice colour (groups merged into "Other" get Other's colour)
+  const colors = new Map();
+  grouped.forEach((slice, i) => {
+    const color = COLORS[i % COLORS.length];
+    colors.set(slice.group, color);
+    slice.members?.forEach((m) => colors.set(m.group, color));
+  });
 
   return (
     <section className={`rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm ${className}`}>
       <h2 className="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 rounded-t-2xl text-sm font-semibold">{title}</h2>
       <div className="p-4 sm:p-5">
-        <div className="relative h-72 sm:h-80">
+        <div className="relative h-60 sm:h-64">
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="animate-pulse w-56 h-56 rounded-full border-[36px] border-zinc-100 dark:border-zinc-800" />
@@ -60,8 +67,8 @@ export default function GroupDoughnutChart({
                   data={grouped}
                   dataKey="totalAmount"
                   nameKey="group"
-                  innerRadius={70}
-                  outerRadius={110}
+                  innerRadius="68%"
+                  outerRadius="100%"
                   paddingAngle={1}
                   stroke="var(--bg)"
                   onClick={(entry) => onSliceClick(entry.group, entry.members)}
@@ -79,20 +86,15 @@ export default function GroupDoughnutChart({
                     borderRadius: 8,
                   }}
                 />
-                <Legend
-                  onClick={(entry) => {
-                    const slice = grouped.find((g) => g.group === entry.value);
-                    onSliceClick(entry.value, slice?.members);
-                  }}
-                  iconType="circle"
-                  iconSize={8}
-                  formatter={(value) => (
-                    <span className="text-xs text-zinc-600 dark:text-zinc-300">{labelOf(value)}</span>
-                  )}
-                  wrapperStyle={{ cursor: "pointer", lineHeight: "1.75" }}
-                />
               </PieChart>
             </ResponsiveContainer>
+          )}
+
+          {!loading && grouped.length > 0 && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">Total</span>
+              <span className="text-lg font-semibold">{formatDin(total)}</span>
+            </div>
           )}
         </div>
 
@@ -104,6 +106,7 @@ export default function GroupDoughnutChart({
             <GroupList
               data={data}
               selected={selected}
+              colors={colors}
               onPick={(group) => onSliceClick(group)}
             />
           </div>
