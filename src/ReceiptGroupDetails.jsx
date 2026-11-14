@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { fetchReceipt, formatDin, requestReceiptPhoto } from "./api.js";
 import PhotoLightbox from "./PhotoLightbox.jsx";
+import ReceiptDetails from "./ReceiptDetails.jsx";
 import ReceiptEditor from "./ReceiptEditor.jsx";
 import GroupList from "./GroupList.jsx";
 import { OTHER_KEY } from "./groups.js";
@@ -160,6 +161,9 @@ function ReceiptCard({ receipt, onReceiptUpdated }) {
 
       {!editing && expanded && full && (
         <div className="mx-4 mb-4 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3">
+          <div className="mb-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+            <ReceiptDetails receipt={full} />
+          </div>
           <ul className="space-y-2">
             {items.map((item, i) => {
               const line = (item.quantity || 0) * (item.unitPrice || 0);
