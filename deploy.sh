@@ -32,6 +32,10 @@ echo "==> Syncing the rest to s3://$BUCKET"
 aws s3 sync dist "s3://$BUCKET" --delete --only-show-errors --exclude "assets/*" \
   --cache-control "no-cache"
 
+# s3 sync doesn't know the .webmanifest extension, so set its content type explicitly.
+aws s3 cp dist/manifest.webmanifest "s3://$BUCKET/manifest.webmanifest" --only-show-errors \
+  --content-type "application/manifest+json" --cache-control "no-cache"
+
 echo "==> Invalidating CloudFront $DISTRIBUTION_ID"
 aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*" \
   --query Invalidation.Id --output text

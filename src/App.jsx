@@ -31,6 +31,18 @@ function App() {
     }
   }, [auth.isAuthenticated, navigate]);
 
+  // The stored user survives an app kill, but its tokens expire after ~1h and
+  // automaticSilentRenew only runs while the app is open. react-oidc-context
+  // treats an expired user as signed out, so on launch use the stored refresh
+  // token to get fresh tokens (no redirect, no "Sign in" click).
+  const canRefresh =
+    !auth.isLoading && !auth.isAuthenticated && !auth.error && !!auth.user?.refresh_token;
+  useEffect(() => {
+    if (canRefresh) {
+      auth.signinSilent().catch(() => auth.removeUser()); // refresh token expired/revoked
+    }
+  }, [canRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // a failed callback leaves ?code=&state= in the URL; strip it so the next
   // launch/reload doesn't retry the same (already used) code
   useEffect(() => {
@@ -39,7 +51,7 @@ function App() {
     }
   }, [auth.error]);
 
-  if (auth.isLoading) {
+  if (auth.isLoading || canRefresh || auth.activeNavigator === "signinSilent") {
     return (
       <Screen>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 animate-pulse">Loading…</p>
