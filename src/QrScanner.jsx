@@ -300,8 +300,9 @@ function ScannerDialog({ idToken, onToast, onImported, onClose }) {
     if (!isReceipt) return;
     let cancelled = false;
     importReceiptFromQr(idToken, result)
-      .then(({ receiptId, created }) => {
+      .then(({ receipt, created }) => {
         if (cancelled) return;
+        const receiptId = receipt.id;
         setImportState({ status: "done", receiptId, created });
         onToast?.({
           message: created

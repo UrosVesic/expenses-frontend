@@ -103,7 +103,7 @@ export function isSufUrl(text) {
 }
 
 // Import a receipt from its scanned QR URL; montra-api fetches the SUF data server-side.
-// -> { receiptId, created } (created = false when this invoice was already saved)
+// -> { receipt, created } (receipt = full ReceiptResponse; created = false when this invoice was already saved)
 export function importReceiptFromQr(idToken, verificationUrl) {
   return fetchJson(`${API_BASE_URL}/receipts`, idToken, {
     method: "POST",
