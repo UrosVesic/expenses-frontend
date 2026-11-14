@@ -1,14 +1,21 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 // Full-screen viewer for a receipt photo. Closes on the backdrop, the button or Escape.
 export default function PhotoLightbox({ url, onClose }) {
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // capture phase + stopImmediatePropagation: Escape closes only the lightbox, not a dialog under it
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
-  return (
+  // portal: may be opened from inside another dialog
+  return createPortal(
     <div
       className="fixed inset-0 z-[75] flex items-center justify-center bg-black/80 p-4"
       onClick={onClose}
@@ -29,6 +36,7 @@ export default function PhotoLightbox({ url, onClose }) {
         className="max-h-full max-w-full rounded-lg shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       />
-    </div>
+    </div>,
+    document.body,
   );
 }
