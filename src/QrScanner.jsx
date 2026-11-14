@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import AttachPhoto from "./AttachPhoto.jsx";
 import { importReceiptFromQr, isSufUrl } from "./api.js";
+import ReceiptEditor from "./ReceiptEditor.jsx";
+import ReceiptPreview from "./ReceiptPreview.jsx";
 
 // Scans a fiscal receipt QR code with the camera and sends its verification URL to montra-api
 // (POST /receipts), which fetches the SUF data server-side (the SUF host blocks browser CORS).
@@ -303,7 +305,7 @@ function ScannerDialog({ idToken, onToast, onImported, onClose }) {
       .then(({ receipt, created }) => {
         if (cancelled) return;
         const receiptId = receipt.id;
-        setImportState({ status: "done", receiptId, created });
+        setImportState({ status: "done", receiptId, created, receipt, editing: false });
         onToast?.({
           message: created
             ? "Receipt saved."
@@ -406,6 +408,22 @@ function ScannerDialog({ idToken, onToast, onImported, onClose }) {
                 title={importState.created ? "Receipt saved" : "Already saved"}
                 text={importState.created ? "It now shows up in your expenses." : "You scanned this receipt before."}
               />
+              {importState.editing ? (
+                <ReceiptEditor
+                  receipt={importState.receipt}
+                  onCancel={() => setImportState((s) => ({ ...s, editing: false }))}
+                  onSaved={(updated) => {
+                    setImportState((s) => ({ ...s, receipt: updated, editing: false }));
+                    onToast?.({ message: "Receipt updated.", type: "success" });
+                    onImported?.(updated.id);
+                  }}
+                />
+              ) : (
+                <ReceiptPreview
+                  receipt={importState.receipt}
+                  onEdit={() => setImportState((s) => ({ ...s, editing: true }))}
+                />
+              )}
               <AttachPhoto idToken={idToken} receiptId={importState.receiptId} onToast={onToast} />
             </>
           )}

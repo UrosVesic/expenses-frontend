@@ -70,7 +70,9 @@ export async function fetchJson(url, idToken, options = {}) {
   });
 
   if (!res.ok) {
-    throw new Error(`Request failed with status ${res.status}`);
+    const error = new Error(`Request failed with status ${res.status}`);
+    error.status = res.status;
+    throw error;
   }
 
   return res.json();
@@ -82,11 +84,13 @@ export function formatDin(value) {
 
 // Manual correction. `items` is the full list: items with `id` are updated, items without are
 // added, missing ones are removed. unitPrice may be negative (discounts). -> updated receipt
-export function updateReceipt(idToken, receiptId, { totalAmount, items }) {
+// Full replace of the editable fields: { totalAmount, purchasedAt, transactionType, payments,
+// category, merchant, location, address, city, items }. Omitted nullable fields are cleared.
+export function updateReceipt(idToken, receiptId, body) {
   return fetchJson(`${API_BASE_URL}/receipts/${encodeURIComponent(receiptId)}`, idToken, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ totalAmount, items }),
+    body: JSON.stringify(body),
   });
 }
 
