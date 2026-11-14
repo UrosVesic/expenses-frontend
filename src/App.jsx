@@ -31,6 +31,14 @@ function App() {
     }
   }, [auth.isAuthenticated, navigate]);
 
+  // a failed callback leaves ?code=&state= in the URL; strip it so the next
+  // launch/reload doesn't retry the same (already used) code
+  useEffect(() => {
+    if (auth.error && window.location.search) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [auth.error]);
+
   if (auth.isLoading) {
     return (
       <Screen>
