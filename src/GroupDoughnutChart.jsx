@@ -73,12 +73,16 @@ export default function GroupDoughnutChart({
                   stroke="var(--bg)"
                   onClick={(entry) => onSliceClick(entry.group, entry.members)}
                   cursor="pointer"
+                  // both charts stay mounted and the hidden one is display:none, so the
+                  // sweep animation would replay on every tab switch (janky on phones)
+                  isAnimationActive={false}
                 >
                   {grouped.map((entry, index) => (
                     <Cell key={entry.group} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip
+                  isAnimationActive={false}
                   formatter={(value, name) => [formatDin(value), labelOf(name)]}
                   contentStyle={{
                     background: "var(--bg)",

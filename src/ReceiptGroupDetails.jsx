@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "react-oidc-context";
-import { formatDin, requestReceiptPhoto } from "./api.js";
+import { fetchReceipt, formatDin, requestReceiptPhoto } from "./api.js";
 import PhotoLightbox from "./PhotoLightbox.jsx";
 import ReceiptEditor from "./ReceiptEditor.jsx";
 import GroupList from "./GroupList.jsx";
@@ -13,9 +13,13 @@ function formatDate(dateString) {
   return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
-function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
+// `receipt` is the slim row from GET /expenses; the full receipt (items) is loaded on first
+// expand or edit, so a month with many receipts costs one request, not one per receipt.
+function ReceiptCard({ receipt, onReceiptUpdated }) {
   const auth = useAuth();
-  const [receipt, setReceipt] = useState(initial);
+  const [full, setFull] = useState(null);
+  const [fullLoading, setFullLoading] = useState(false);
+  const [fullError, setFullError] = useState(null);
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(null);
@@ -39,9 +43,34 @@ function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
     }
   };
 
-  const needsReview = receipt.status === "NEEDS_REVIEW";
+  const loadFull = async () => {
+    if (full) return full;
+    setFullLoading(true);
+    setFullError(null);
+    try {
+      const loaded = await fetchReceipt(auth.user?.id_token, receipt.id);
+      setFull(loaded);
+      return loaded;
+    } catch {
+      setFullError("Couldn't load the receipt.");
+      return null;
+    } finally {
+      setFullLoading(false);
+    }
+  };
+
+  const toggle = () => {
+    if (!expanded) loadFull();
+    setExpanded((v) => !v);
+  };
+
+  const startEditing = async () => {
+    if (await loadFull()) setEditing(true);
+  };
+
+  const needsReview = (full?.status ?? receipt.status) === "NEEDS_REVIEW";
   const name = prettyMerchant(receipt.merchant);
-  const items = receipt.items || [];
+  const items = full?.items || [];
 
   return (
     <div
@@ -53,7 +82,7 @@ function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
     >
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={toggle}
         aria-expanded={expanded}
         className="flex items-center gap-3 w-full text-left px-4 pt-3 pb-2 cursor-pointer"
       >
@@ -64,8 +93,12 @@ function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
           </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
             {formatDate(receipt.purchasedAt)}
-            <span aria-hidden="true">·</span>
-            {plural(items.length, "item")}
+            {full && (
+              <>
+                <span aria-hidden="true">·</span>
+                {plural(items.length, "item")}
+              </>
+            )}
             {needsReview && (
               <span className="rounded-full px-2 py-px text-[11px] font-medium bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800">
                 Needs review
@@ -74,7 +107,7 @@ function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
           </p>
         </div>
         <p className="shrink-0 text-base font-semibold text-zinc-900 dark:text-zinc-100">
-          {formatDin(receipt.totalAmount)}
+          {formatDin(receipt.amount)}
         </p>
         <svg
           className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
@@ -90,7 +123,7 @@ function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
 
       {!editing && (
         <div className="flex flex-wrap items-center gap-2 pl-[3.75rem] pr-4 pb-3">
-          <Chip onClick={() => setEditing(true)} tone={needsReview ? "amber" : "zinc"}>
+          <Chip onClick={startEditing} disabled={fullLoading} tone={needsReview ? "amber" : "zinc"}>
             <PencilIcon />
             {needsReview ? "Review" : "Edit"}
           </Chip>
@@ -101,6 +134,7 @@ function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
             </Chip>
           )}
           {photoError && <span className="text-xs text-red-600 dark:text-red-400">{photoError}</span>}
+          {fullError && <span className="text-xs text-red-600 dark:text-red-400">{fullError}</span>}
         </div>
       )}
       {photoUrl && <PhotoLightbox url={photoUrl} onClose={() => setPhotoUrl(null)} />}
@@ -108,10 +142,10 @@ function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
       {editing && (
         <div className="px-4 pb-4">
           <ReceiptEditor
-            receipt={receipt}
+            receipt={full}
             onCancel={() => setEditing(false)}
             onSaved={(updated) => {
-              setReceipt(updated);
+              setFull(updated);
               setEditing(false);
               setExpanded(true);
               onReceiptUpdated?.(updated);
@@ -120,7 +154,11 @@ function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
         </div>
       )}
 
-      {!editing && expanded && (
+      {!editing && expanded && !full && fullLoading && (
+        <p className="mx-4 mb-4 text-sm text-zinc-500 dark:text-zinc-400">Loading items…</p>
+      )}
+
+      {!editing && expanded && full && (
         <div className="mx-4 mb-4 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3">
           <ul className="space-y-2">
             {items.map((item, i) => {
@@ -148,7 +186,7 @@ function ReceiptCard({ receipt: initial, onReceiptUpdated }) {
           </ul>
           <div className="mt-3 pt-2 border-t border-dashed border-zinc-300 dark:border-zinc-700 flex justify-between text-sm font-semibold">
             <span>Total</span>
-            <span>{formatDin(receipt.totalAmount)}</span>
+            <span>{formatDin(full.totalAmount)}</span>
           </div>
         </div>
       )}

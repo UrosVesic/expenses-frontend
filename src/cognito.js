@@ -8,3 +8,16 @@ const LOGOUT_URI = `${window.location.origin}/`;
 export function signOutRedirect() {
   window.location.href = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(LOGOUT_URI)}`;
 }
+
+// "Switch account": sign out of the app and of Cognito, then (on the landing page,
+// see App.jsx) start a new sign-in that forces Google's account chooser.
+export const SWITCH_ACCOUNT_FLAG = "switchAccount";
+
+export function switchAccountRedirect() {
+  try {
+    localStorage.setItem(SWITCH_ACCOUNT_FLAG, "1");
+  } catch {
+    // storage unavailable: falls back to a plain sign-out
+  }
+  signOutRedirect();
+}

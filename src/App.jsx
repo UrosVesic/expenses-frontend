@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
+import { SWITCH_ACCOUNT_FLAG } from "./cognito.js";
 
 // same rule as the dashboard: saved choice, else the OS preference
 function applyStoredTheme() {
@@ -42,6 +43,17 @@ function App() {
       auth.signinSilent().catch(() => auth.removeUser()); // refresh token expired/revoked
     }
   }, [canRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // coming back from "Switch account": Cognito's session is gone, so go straight
+  // to sign-in and make Google show its account chooser
+  const idle = !auth.isLoading && !auth.isAuthenticated && !auth.error && !canRefresh;
+  useEffect(() => {
+    if (!idle || window.location.search) return;
+    if (localStorage.getItem(SWITCH_ACCOUNT_FLAG)) {
+      localStorage.removeItem(SWITCH_ACCOUNT_FLAG);
+      auth.signinRedirect({ extraQueryParams: { prompt: "select_account" } });
+    }
+  }, [idle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // a failed callback leaves ?code=&state= in the URL; strip it so the next
   // launch/reload doesn't retry the same (already used) code

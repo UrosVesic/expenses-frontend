@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
-import { signOutRedirect } from "./cognito.js";
+import { signOutRedirect, switchAccountRedirect } from "./cognito.js";
 import ReceiptUpload from "./ReceiptUpload.jsx";
 import GroupDoughnutChart from "./GroupDoughnutChart.jsx";
 import ReceiptGroupDetails from "./ReceiptGroupDetails.jsx";
 import Toast from "./Toast.jsx";
 import MonthPicker from "./MonthPicker.jsx";
 import QrScannerButton from "./QrScanner.jsx";
-import { EXPENSES_BASE_URL, fetchJson, formatDin, monthQuery } from "./api.js";
-import { OTHER_KEY } from "./groups.js";
+import { fetchMonthlyExpenses, formatDin } from "./api.js";
+import { OTHER_KEY, groupDetails, groupExpenses } from "./groups.js";
 
 // v2 key: months are now "YYYY-MM" (same as the API and <input type="month">)
 const MONTH_STORAGE_KEY = "expenses-dashboard-month-v2";
@@ -30,54 +30,38 @@ function initialTheme() {
     : "light";
 }
 
-// Selection + receipts of one chart (kind = "category" | "merchant").
-// `others` holds the groups hidden behind the chart's "Other" slice. They are shown as a
-// breakdown (selected === OTHER_KEY) and never requested from the API.
-function useGroupPanel(kind, idToken, month, setToast) {
+// Selection of one chart (kind = "category" | "merchant"). Receipts come from the month's
+// expense list already in memory, so switching groups never calls the API.
+// `others` holds the groups hidden behind the chart's "Other" slice, shown as a breakdown
+// (selected === OTHER_KEY).
+function useGroupPanel(kind, expenses) {
   const [selected, setSelected] = useState(null);
-  const [details, setDetails] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [others, setOthers] = useState(null);
-  const latest = useRef(0);
 
   const reset = () => {
-    latest.current++;
     setSelected(null);
-    setDetails(null);
-    setLoading(false);
     setOthers(null);
   };
 
   // `members` is set when the "Other" slice was clicked
   const select = (group, members) => {
-    const id = ++latest.current;
     setSelected(group);
-    setDetails(null);
     if (group === OTHER_KEY) {
       setOthers(members ?? []);
-      setLoading(false);
       return;
     }
     // picking from the breakdown keeps it for "back"; any other pick clears it
     if (members === undefined) setOthers(null);
-    setLoading(true);
-    fetchJson(
-      `${EXPENSES_BASE_URL}/${kind}/receipts?name=${encodeURIComponent(group)}&${monthQuery(month)}`,
-      idToken,
-    )
-      .then((d) => latest.current === id && setDetails(d))
-      .catch(() => latest.current === id && setToast({ message: `Failed to fetch ${group} details.`, type: "error" }))
-      .finally(() => latest.current === id && setLoading(false));
   };
 
-  const backToOther = () => {
-    latest.current++;
-    setSelected(OTHER_KEY);
-    setDetails(null);
-    setLoading(false);
-  };
+  const backToOther = () => setSelected(OTHER_KEY);
 
-  return { selected, details, loading, others, select, reset, backToOther };
+  const details = useMemo(
+    () => (selected && selected !== OTHER_KEY ? groupDetails(expenses, kind, selected) : null),
+    [expenses, kind, selected],
+  );
+
+  return { selected, details, loading: false, others, select, reset, backToOther };
 }
 
 export default function Dashboard() {
@@ -90,18 +74,16 @@ export default function Dashboard() {
   );
   const [theme, setTheme] = useState(initialTheme);
   const [tab, setTab] = useState("category"); // mobile only: which breakdown is shown
-  const [categoryData, setCategoryData] = useState([]);
-  const [issuerData, setIssuerData] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
-  const [receiptStats, setReceiptStats] = useState({
-    totalReceipts: null,
-    avgPerReceipt: 0,
-  });
 
-  const category = useGroupPanel("category", idToken, month, setToast);
-  const issuer = useGroupPanel("merchant", idToken, month, setToast);
+  const categoryData = useMemo(() => groupExpenses(expenses, "category"), [expenses]);
+  const issuerData = useMemo(() => groupExpenses(expenses, "merchant"), [expenses]);
+  const category = useGroupPanel("category", expenses);
+  const issuer = useGroupPanel("merchant", expenses);
 
   const requestId = useRef(0);
   // below lg the receipts panel sits under the chart: scroll to it after a pick
@@ -113,7 +95,7 @@ export default function Dashboard() {
       ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
-  // display name sent by the API; the raw group stays the key for requests
+  // display name of a group; the raw group stays the key
   const labelOf = (groups, group) => groups.find((g) => g.group === group)?.label ?? group;
   // bumped after a receipt is edited so the charts and stats reload
   const [reloadKey, setReloadKey] = useState(0);
@@ -146,25 +128,13 @@ export default function Dashboard() {
       if (cancelled) return;
       setLoading(true);
       setError(null);
-      setReceiptStats({ totalReceipts: null, avgPerReceipt: 0 });
     });
 
-    Promise.all([
-      fetchJson(`${EXPENSES_BASE_URL}/category?${monthQuery(month)}`, idToken),
-      fetchJson(`${EXPENSES_BASE_URL}/merchant?${monthQuery(month)}`, idToken),
-    ])
-      .then(([categories, merchants]) => {
+    fetchMonthlyExpenses(idToken, month)
+      .then(({ expenses, truncated }) => {
         if (requestId.current !== currentRequest) return;
-        setCategoryData(categories);
-        setIssuerData(merchants);
-
-        // each group carries its receipt count, so no per-group requests are needed
-        const totalReceipts = categories.reduce((sum, c) => sum + (c.receiptCount || 0), 0);
-        const totalAmount = categories.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
-        setReceiptStats({
-          totalReceipts,
-          avgPerReceipt: totalReceipts > 0 ? totalAmount / totalReceipts : 0,
-        });
+        setExpenses(expenses);
+        setTruncated(truncated);
       })
       .catch((err) => {
         if (requestId.current !== currentRequest) return;
@@ -185,7 +155,9 @@ export default function Dashboard() {
     return <div className="p-8">Loading...</div>;
   }
 
-  const totalExpenses = categoryData.reduce((sum, item) => sum + item.totalAmount, 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalReceipts = expenses.length;
+  const avgPerReceipt = totalReceipts > 0 ? totalExpenses / totalReceipts : 0;
   const topCategory = categoryData.length
     ? categoryData.reduce((max, item) => (item.totalAmount > max.totalAmount ? item : max))
     : null;
@@ -234,6 +206,15 @@ export default function Dashboard() {
             </button>
             <button
               type="button"
+              onClick={() => auth.removeUser().then(switchAccountRedirect)}
+              aria-label="Switch account"
+              className="h-10 lg:h-8 min-w-10 px-0 sm:px-3 inline-flex items-center justify-center gap-2 text-sm rounded-full lg:rounded-md text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              <SwitchIcon />
+              <span className="hidden sm:inline">Switch account</span>
+            </button>
+            <button
+              type="button"
               onClick={() => auth.removeUser().then(signOutRedirect)}
               aria-label="Sign out"
               className="h-10 lg:h-8 min-w-10 px-0 sm:px-3 inline-flex items-center justify-center gap-2 text-sm rounded-full lg:rounded-md text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -275,6 +256,12 @@ export default function Dashboard() {
           <p className="mb-6 text-sm text-red-600 dark:text-red-400">Error: {error}</p>
         )}
 
+        {truncated && (
+          <p className="mb-4 text-sm text-amber-700 dark:text-amber-400">
+            This month has too many receipts to show them all; totals cover the newest ones only.
+          </p>
+        )}
+
         {categoryData.length > 0 && (
           <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5 lg:mb-8">
             <div className="col-span-2 rounded-2xl p-5 text-white bg-gradient-to-br from-zinc-800 to-zinc-950 dark:from-zinc-700 dark:to-zinc-900 shadow-sm min-w-0">
@@ -284,8 +271,8 @@ export default function Dashboard() {
                 Top category: <span className="font-medium text-white">{topCategory ? (topCategory.label ?? topCategory.group) : "-"}</span>
               </p>
             </div>
-            <Stat label="Receipts" value={receiptStats.totalReceipts ?? "…"} />
-            <Stat label="Average receipt" value={formatDin(receiptStats.avgPerReceipt)} />
+            <Stat label="Receipts" value={loading ? "…" : totalReceipts} />
+            <Stat label="Average receipt" value={formatDin(avgPerReceipt)} />
           </dl>
         )}
 
@@ -406,6 +393,14 @@ function SunIcon() {
     <svg {...iconProps}>
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function SwitchIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M16 3l4 4-4 4M20 7H8M8 21l-4-4 4-4M4 17h12" />
     </svg>
   );
 }

@@ -11,8 +11,18 @@ export const EXPENSES_BASE_URL = `${API_BASE_URL}/expenses`;
 // and how receipt times without an offset are read.
 export const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-// Query string for the month endpoints: ?month=2026-11 (YYYY-MM)
-export const monthQuery = (month) => `month=${encodeURIComponent(month)}`;
+// The month's receipts in slim form (newest first); the dashboard groups them itself.
+// -> { expenses: [{ id, purchasedAt, merchant, category, categoryLabel, amount, status, hasPhoto }], truncated }
+// amount is negative for refunds. tz decides where the month starts and ends.
+export function fetchMonthlyExpenses(idToken, month) {
+  const query = `month=${encodeURIComponent(month)}&tz=${encodeURIComponent(TIME_ZONE)}`;
+  return fetchJson(`${EXPENSES_BASE_URL}?${query}`, idToken);
+}
+
+// Full receipt with items, for the detail view / editor.
+export function fetchReceipt(idToken, receiptId) {
+  return fetchJson(`${API_BASE_URL}/receipts/${encodeURIComponent(receiptId)}`, idToken);
+}
 
 // Ask the presigner for a URL to PUT a receipt image to S3.
 export function requestUploadUrl(idToken, contentType) {

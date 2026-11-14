@@ -38,3 +38,44 @@ export function groupSmallSlices(data) {
 
   return kept;
 }
+
+// Group keys for receipts without a category / merchant (same buckets the API used to return).
+const UNCATEGORIZED = "UNCATEGORIZED";
+const UNKNOWN_MERCHANT = "UNKNOWN";
+
+// How each breakdown reads its group key and display label from a slim expense row.
+export const GROUPINGS = {
+  category: {
+    key: (e) => e.category ?? UNCATEGORIZED,
+    label: (e) => e.categoryLabel ?? "Uncategorized",
+  },
+  merchant: {
+    key: (e) => e.merchant ?? UNKNOWN_MERCHANT,
+    label: (e) => e.merchant ?? "Unknown merchant",
+  },
+};
+
+// [{ group, label, totalAmount, receiptCount }], biggest first. Refunds already count negative.
+export function groupExpenses(expenses, kind) {
+  const { key, label } = GROUPINGS[kind];
+  const byGroup = new Map();
+  for (const e of expenses) {
+    const k = key(e);
+    const g = byGroup.get(k) ?? { group: k, label: label(e), totalAmount: 0, receiptCount: 0 };
+    g.totalAmount += e.amount;
+    g.receiptCount += 1;
+    byGroup.set(k, g);
+  }
+  return [...byGroup.values()].sort((a, b) => b.totalAmount - a.totalAmount);
+}
+
+// { label, totalAmount, receipts } of one group; receipts keep the API order (newest first).
+export function groupDetails(expenses, kind, group) {
+  const { key, label } = GROUPINGS[kind];
+  const receipts = expenses.filter((e) => key(e) === group);
+  return {
+    label: receipts.length ? label(receipts[0]) : group,
+    totalAmount: receipts.reduce((sum, e) => sum + e.amount, 0),
+    receipts,
+  };
+}
