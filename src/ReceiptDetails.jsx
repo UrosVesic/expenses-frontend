@@ -1,4 +1,4 @@
-import { formatDin } from "./api.js";
+import { formatMoney } from "./api.js";
 import { paymentLabel } from "./receiptOptions.js";
 
 // Read-only header fields of a full receipt: category, type, where, payments.
@@ -24,7 +24,7 @@ export default function ReceiptDetails({ receipt }) {
       {payments.length > 0 && (
         <>
           <dt className="text-zinc-500 dark:text-zinc-400">Paid</dt>
-          <dd>{payments.map((p) => `${paymentLabel(p.type)} ${formatDin(p.amount)}`).join(" · ")}</dd>
+          <dd>{payments.map((p) => `${paymentLabel(p.type)} ${formatMoney(p.amount, receipt.currency)}`).join(" · ")}</dd>
         </>
       )}
     </dl>

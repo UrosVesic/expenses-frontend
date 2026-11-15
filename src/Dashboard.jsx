@@ -8,7 +8,9 @@ import ReceiptGroupDetails from "./ReceiptGroupDetails.jsx";
 import Toast from "./Toast.jsx";
 import MonthPicker from "./MonthPicker.jsx";
 import QrScannerButton from "./QrScanner.jsx";
-import { fetchMonthlyExpenses, formatDin } from "./api.js";
+import { fetchMonthlyExpenses, updateProfileCurrency } from "./api.js";
+import { DisplayCurrencyContext, formatTotals, sumByCurrency, withShownAmount } from "./currency.js";
+import { CURRENCIES } from "./receiptOptions.js";
 import { OTHER_KEY, groupDetails, groupExpenses } from "./groups.js";
 
 // v2 key: months are now "YYYY-MM" (same as the API and <input type="month">)
@@ -76,6 +78,8 @@ export default function Dashboard() {
   const [tab, setTab] = useState("category"); // mobile only: which breakdown is shown
   const [expenses, setExpenses] = useState([]);
   const [truncated, setTruncated] = useState(false);
+  // profile currency: /expenses converts every amount into it; null = original currencies
+  const [currency, setCurrency] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
@@ -131,9 +135,10 @@ export default function Dashboard() {
     });
 
     fetchMonthlyExpenses(idToken, month)
-      .then(({ expenses, truncated }) => {
+      .then(({ currency, expenses, truncated }) => {
         if (requestId.current !== currentRequest) return;
-        setExpenses(expenses);
+        setCurrency(currency ?? null);
+        setExpenses(expenses.map((e) => withShownAmount(e, currency ?? null)));
         setTruncated(truncated);
       })
       .catch((err) => {
@@ -151,13 +156,28 @@ export default function Dashboard() {
     };
   }, [month, auth.isAuthenticated, idToken, reloadKey]);
 
+  // Saves the profile currency ("" = original currencies), then reloads the month.
+  const changeCurrency = (next) => {
+    const previous = currency;
+    setCurrency(next || null);
+    updateProfileCurrency(idToken, next || null)
+      .then(() => setReloadKey((k) => k + 1))
+      .catch(() => {
+        setCurrency(previous);
+        setToast({ message: "Couldn't change the currency. Please try again.", type: "error" });
+      });
+  };
+
   if (auth.isLoading || !auth.isAuthenticated) {
     return <div className="p-8">Loading...</div>;
   }
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
   const totalReceipts = expenses.length;
-  const avgPerReceipt = totalReceipts > 0 ? totalExpenses / totalReceipts : 0;
+  const totalsByCurrency = sumByCurrency(expenses);
+  // average per currency: the mean of the receipts in that currency
+  const averageByCurrency = Object.fromEntries(
+    Object.entries(totalsByCurrency).map(([c, sum]) => [c, sum / expenses.filter((e) => e.shownCurrency === c).length]),
+  );
   const topCategory = categoryData.length
     ? categoryData.reduce((max, item) => (item.totalAmount > max.totalAmount ? item : max))
     : null;
@@ -178,6 +198,7 @@ export default function Dashboard() {
   const show = (key) => (tab === key ? "" : "hidden lg:block");
 
   return (
+    <DisplayCurrencyContext.Provider value={currency}>
     <div className="min-h-dvh bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <Toast toast={toast} onDismiss={() => setToast(null)} />
 
@@ -189,6 +210,20 @@ export default function Dashboard() {
           </span>
 
           <div className="flex items-center gap-1 sm:gap-3">
+            <select
+              aria-label="Display currency"
+              value={currency ?? ""}
+              disabled={loading}
+              onChange={(e) => changeCurrency(e.target.value)}
+              className="h-10 lg:h-8 rounded-full lg:rounded-md bg-transparent px-2 text-sm text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              <option value="">Original</option>
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
             <span className="hidden sm:block text-sm text-zinc-500 dark:text-zinc-400 mr-1">
               {auth.user?.profile.email}
             </span>
@@ -266,13 +301,13 @@ export default function Dashboard() {
           <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5 lg:mb-8">
             <div className="col-span-2 rounded-2xl p-5 text-white bg-gradient-to-br from-zinc-800 to-zinc-950 dark:from-zinc-700 dark:to-zinc-900 shadow-sm min-w-0">
               <dt className="text-xs font-medium text-zinc-300">Total spent</dt>
-              <dd className="mt-1 text-3xl font-semibold tracking-tight truncate">{formatDin(totalExpenses)}</dd>
+              <dd className="mt-1 text-3xl font-semibold tracking-tight truncate">{formatTotals(totalsByCurrency, currency)}</dd>
               <p className="mt-2 text-xs text-zinc-300 truncate">
                 Top category: <span className="font-medium text-white">{topCategory ? (topCategory.label ?? topCategory.group) : "-"}</span>
               </p>
             </div>
             <Stat label="Receipts" value={loading ? "…" : totalReceipts} />
-            <Stat label="Average receipt" value={formatDin(avgPerReceipt)} />
+            <Stat label="Average receipt" value={formatTotals(averageByCurrency, currency)} />
           </dl>
         )}
 
@@ -334,6 +369,7 @@ export default function Dashboard() {
         </TabButton>
       </nav>
     </div>
+    </DisplayCurrencyContext.Provider>
   );
 }
 

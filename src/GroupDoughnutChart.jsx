@@ -5,7 +5,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { formatDin } from "./api.js";
+import { formatTotals, mergeByCurrency, useDisplayCurrency } from "./currency.js";
 import { groupSmallSlices } from "./groups.js";
 import GroupList from "./GroupList.jsx";
 
@@ -30,10 +30,12 @@ export default function GroupDoughnutChart({
   onSliceClick,
   className = "",
 }) {
+  const currency = useDisplayCurrency();
   const grouped = data.length > 0 ? groupSmallSlices(data) : [];
   // labels come from the API; the raw group is the key used for clicks
   const labelOf = (group) => grouped.find((g) => g.group === group)?.label ?? group;
-  const total = data.reduce((sum, g) => sum + g.totalAmount, 0);
+  const totals = mergeByCurrency(data.map((g) => g.byCurrency));
+  const totalsOf = (group) => grouped.find((g) => g.group === group)?.byCurrency ?? {};
   // list rows reuse the slice colour (groups merged into "Other" get Other's colour)
   const colors = new Map();
   grouped.forEach((slice, i) => {
@@ -83,7 +85,7 @@ export default function GroupDoughnutChart({
                 </Pie>
                 <Tooltip
                   isAnimationActive={false}
-                  formatter={(value, name) => [formatDin(value), labelOf(name)]}
+                  formatter={(_, name) => [formatTotals(totalsOf(name), currency), labelOf(name)]}
                   contentStyle={{
                     background: "var(--bg)",
                     border: "1px solid var(--border)",
@@ -97,7 +99,7 @@ export default function GroupDoughnutChart({
           {!loading && grouped.length > 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-xs text-zinc-500 dark:text-zinc-400">Total</span>
-              <span className="text-lg font-semibold">{formatDin(total)}</span>
+              <span className="text-lg font-semibold text-center px-10 leading-tight">{formatTotals(totals, currency)}</span>
             </div>
           )}
         </div>

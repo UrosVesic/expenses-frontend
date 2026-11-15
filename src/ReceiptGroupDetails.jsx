@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "react-oidc-context";
-import { fetchReceipt, formatDin, requestReceiptPhoto } from "./api.js";
+import { fetchReceipt, formatMoney, requestReceiptPhoto } from "./api.js";
+import { formatTotals, useDisplayCurrency } from "./currency.js";
 import PhotoLightbox from "./PhotoLightbox.jsx";
 import ReceiptDetails from "./ReceiptDetails.jsx";
 import ReceiptEditor from "./ReceiptEditor.jsx";
@@ -108,7 +109,12 @@ function ReceiptCard({ receipt, onReceiptUpdated }) {
           </p>
         </div>
         <p className="shrink-0 text-base font-semibold text-zinc-900 dark:text-zinc-100">
-          {formatDin(receipt.amount)}
+          {formatMoney(receipt.shownAmount, receipt.shownCurrency)}
+          {receipt.originalCurrency !== receipt.shownCurrency && (
+            <span className="block text-right text-xs font-normal text-zinc-500 dark:text-zinc-400">
+                            {formatMoney(receipt.originalAmount, receipt.originalCurrency)}
+            </span>
+          )}
         </p>
         <svg
           className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
@@ -173,7 +179,7 @@ function ReceiptCard({ receipt, onReceiptUpdated }) {
                     <p className="text-zinc-800 dark:text-zinc-200 truncate">{item.name}</p>
                     {item.quantity !== 1 && (
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {item.quantity} × {formatDin(item.unitPrice)}
+                        {item.quantity} × {formatMoney(item.unitPrice, full.currency)}
                       </p>
                     )}
                   </div>
@@ -182,7 +188,7 @@ function ReceiptCard({ receipt, onReceiptUpdated }) {
                       line < 0 ? "text-emerald-700 dark:text-emerald-400" : "text-zinc-900 dark:text-zinc-100"
                     }`}
                   >
-                    {formatDin(line)}
+                    {formatMoney(line, full.currency)}
                   </span>
                 </li>
               );
@@ -190,7 +196,7 @@ function ReceiptCard({ receipt, onReceiptUpdated }) {
           </ul>
           <div className="mt-3 pt-2 border-t border-dashed border-zinc-300 dark:border-zinc-700 flex justify-between text-sm font-semibold">
             <span>Total</span>
-            <span>{formatDin(full.totalAmount)}</span>
+            <span>{formatMoney(full.totalAmount, full.currency)}</span>
           </div>
         </div>
       )}
@@ -279,6 +285,7 @@ const ImageIcon = () => (
 );
 
 export default function ReceiptGroupDetails({ groupName, details, loading, panel, onReceiptUpdated }) {
+  const displayCurrency = useDisplayCurrency();
   // "Other" slice: list the small groups it contains; picking one loads its receipts
   if (panel?.selected === OTHER_KEY) {
     return (
@@ -344,7 +351,7 @@ export default function ReceiptGroupDetails({ groupName, details, loading, panel
           <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 truncate">{groupName}</h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">{plural(receipts.length, "receipt")}</p>
         </div>
-        <p className="shrink-0 text-lg font-semibold tracking-tight">{formatDin(details.totalAmount)}</p>
+        <p className="shrink-0 text-lg font-semibold tracking-tight">{formatTotals(details.byCurrency, displayCurrency)}</p>
       </div>
       {sorted.map((receipt, index) => (
         <ReceiptCard key={receipt.id || index} receipt={receipt} onReceiptUpdated={onReceiptUpdated} />

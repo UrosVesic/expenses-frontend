@@ -12,8 +12,10 @@ export const EXPENSES_BASE_URL = `${API_BASE_URL}/expenses`;
 export const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 // The month's receipts in slim form (newest first); the dashboard groups them itself.
-// -> { expenses: [{ id, purchasedAt, merchant, category, categoryLabel, amount, status, hasPhoto }], truncated }
-// amount is negative for refunds. tz decides where the month starts and ends.
+// -> { currency, expenses: [{ id, purchasedAt, merchant, category, categoryLabel, amount,
+//      originalAmount, originalCurrency, converted, status, hasPhoto }], truncated }
+// amount is in `currency` (the profile currency, at the purchase-date NBS rate) and negative for
+// refunds; converted = false means no rate was available and amount is the original. tz decides where the month starts and ends.
 export function fetchMonthlyExpenses(idToken, month) {
   const query = `month=${encodeURIComponent(month)}&tz=${encodeURIComponent(TIME_ZONE)}`;
   return fetchJson(`${EXPENSES_BASE_URL}?${query}`, idToken);
@@ -78,14 +80,29 @@ export async function fetchJson(url, idToken, options = {}) {
   return res.json();
 }
 
-export function formatDin(value) {
-  return `${Math.round(value || 0).toLocaleString()} din`;
+// Dinars without decimals, as before ("1,234 din"); other currencies with two ("€12.50").
+export function formatMoney(value, currency = "RSD") {
+  if (currency === "RSD") return `${Math.round(value || 0).toLocaleString()} din`;
+  return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value || 0);
+}
+
+// -> { currency, supportedCurrencies }; currency is what /expenses converts amounts into.
+export function fetchProfile(idToken) {
+  return fetchJson(`${API_BASE_URL}/profile`, idToken);
+}
+
+export function updateProfileCurrency(idToken, currency) {
+  return fetchJson(`${API_BASE_URL}/profile`, idToken, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ currency }),
+  });
 }
 
 // Manual correction. `items` is the full list: items with `id` are updated, items without are
 // added, missing ones are removed. unitPrice may be negative (discounts). -> updated receipt
 // Full replace of the editable fields: { totalAmount, purchasedAt, transactionType, payments,
-// category, merchant, location, address, city, items }. Omitted nullable fields are cleared.
+// category, merchant, location, address, city, currency, items }. Omitted nullable fields are cleared.
 export function updateReceipt(idToken, receiptId, body) {
   return fetchJson(`${API_BASE_URL}/receipts/${encodeURIComponent(receiptId)}`, idToken, {
     method: "PUT",

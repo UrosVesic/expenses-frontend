@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
-import { formatDin, updateReceipt } from "./api.js";
+import { formatMoney, updateReceipt } from "./api.js";
+import { CURRENCIES } from "./receiptOptions.js";
 import { CATEGORIES, PAYMENT_TYPES, fromLocalInput, toLocalInput } from "./receiptOptions.js";
 
 const toNumber = (value) => (value === "" || value === "-" ? NaN : Number(value));
@@ -41,6 +42,7 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
     city: receipt.city ?? "",
     purchasedAt: toLocalInput(receipt.purchasedAt),
     transactionType: receipt.transactionType ?? "SALE",
+    currency: receipt.currency ?? "RSD",
   }));
   const [payments, setPayments] = useState(() =>
     (receipt.payments || []).map((p) => ({ key: crypto.randomUUID(), type: p.type, amount: String(p.amount) })),
@@ -119,6 +121,7 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
         location: details.location.trim() || null,
         address: details.address.trim() || null,
         city: details.city.trim() || null,
+        currency: details.currency,
         items: rows.map((r) => ({
           // new rows must omit `id` entirely; the API rejects an explicit "id": null
           ...(r.id ? { id: r.id } : {}),
@@ -143,8 +146,8 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
 
   const summary = (
     <span className={`text-sm ${addsUp ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"}`}>
-      Items: {formatDin(itemsSum)}{" "}
-      {addsUp ? "✓ adds up" : Number.isFinite(difference) ? `(off by ${difference.toLocaleString()} din)` : ""}
+      Items: {formatMoney(itemsSum, details.currency)}{" "}
+      {addsUp ? "✓ adds up" : Number.isFinite(difference) ? `(off by ${formatMoney(difference, details.currency)})` : ""}
     </span>
   );
 
@@ -200,6 +203,16 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
             >
               <option value="SALE">Purchase</option>
               <option value="REFUND">Refund</option>
+            </select>
+          </label>
+          <label className={labelClass}>
+            Currency
+            <select className={inputClass} value={details.currency} onChange={(e) => setDetail("currency", e.target.value)}>
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
           </label>
           <label className={labelClass}>
@@ -278,7 +291,7 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
                     value < 0 ? "text-green-600 dark:text-green-400" : "text-zinc-900 dark:text-white"
                   }`}
                 >
-                  {Number.isFinite(value) ? formatDin(value) : "—"}
+                  {Number.isFinite(value) ? formatMoney(value, details.currency) : "—"}
                 </span>
               </div>
             </div>
@@ -321,7 +334,7 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
               <span
                 className={`text-sm ${paymentsMatch ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"}`}
               >
-                {formatDin(paidSum)} {paymentsMatch ? "✓" : `(off by ${paymentsDifference.toLocaleString()} din)`}
+                {formatMoney(paidSum, details.currency)} {paymentsMatch ? "✓" : `(off by ${formatMoney(paymentsDifference, details.currency)})`}
               </span>
             )}
           </div>

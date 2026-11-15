@@ -1,3 +1,5 @@
+import { mergeByCurrency, sumByCurrency } from "./currency.js";
+
 // Synthetic key for the chart's "Other" slice. It never reaches the API: clicking it opens a
 // breakdown of the small groups it swallowed (`members`) instead.
 export const OTHER_KEY = "__other__";
@@ -31,6 +33,7 @@ export function groupSmallSlices(data) {
       group: OTHER_KEY,
       label: "Other",
       totalAmount: members.reduce((sum, m) => sum + m.totalAmount, 0),
+      byCurrency: mergeByCurrency(members.map((m) => m.byCurrency)),
       receiptCount: members.reduce((sum, m) => sum + (m.receiptCount || 0), 0),
       members: [...members].sort((a, b) => b.totalAmount - a.totalAmount),
     });
@@ -55,27 +58,32 @@ export const GROUPINGS = {
   },
 };
 
-// [{ group, label, totalAmount, receiptCount }], biggest first. Refunds already count negative.
+// [{ group, label, totalAmount, byCurrency, receiptCount }], biggest first. Refunds already count
+// negative. totalAmount (one unit) sizes and sorts; byCurrency (see withShownAmount) is displayed.
 export function groupExpenses(expenses, kind) {
   const { key, label } = GROUPINGS[kind];
   const byGroup = new Map();
   for (const e of expenses) {
     const k = key(e);
-    const g = byGroup.get(k) ?? { group: k, label: label(e), totalAmount: 0, receiptCount: 0 };
+    const g = byGroup.get(k) ?? { group: k, label: label(e), totalAmount: 0, rows: [], receiptCount: 0 };
     g.totalAmount += e.amount;
+    g.rows.push(e);
     g.receiptCount += 1;
     byGroup.set(k, g);
   }
-  return [...byGroup.values()].sort((a, b) => b.totalAmount - a.totalAmount);
+  return [...byGroup.values()]
+    .map(({ rows, ...g }) => ({ ...g, byCurrency: sumByCurrency(rows) }))
+    .sort((a, b) => b.totalAmount - a.totalAmount);
 }
 
-// { label, totalAmount, receipts } of one group; receipts keep the API order (newest first).
+// { label, totalAmount, byCurrency, receipts } of one group; receipts keep the API order (newest first).
 export function groupDetails(expenses, kind, group) {
   const { key, label } = GROUPINGS[kind];
   const receipts = expenses.filter((e) => key(e) === group);
   return {
     label: receipts.length ? label(receipts[0]) : group,
     totalAmount: receipts.reduce((sum, e) => sum + e.amount, 0),
+    byCurrency: sumByCurrency(receipts),
     receipts,
   };
 }

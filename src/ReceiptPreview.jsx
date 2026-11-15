@@ -1,4 +1,4 @@
-import { formatDin } from "./api.js";
+import { formatMoney } from "./api.js";
 import ReceiptDetails from "./ReceiptDetails.jsx";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -38,7 +38,7 @@ export default function ReceiptPreview({ receipt, onEdit }) {
                 {item.quantity !== 1 && <span className="text-zinc-500 dark:text-zinc-400">{item.quantity} × </span>}
                 {item.name}
               </span>
-              <span className={`shrink-0 ${line < 0 ? "text-green-600 dark:text-green-400" : ""}`}>{formatDin(line)}</span>
+              <span className={`shrink-0 ${line < 0 ? "text-green-600 dark:text-green-400" : ""}`}>{formatMoney(line, receipt.currency)}</span>
             </li>
           );
         })}
@@ -47,13 +47,13 @@ export default function ReceiptPreview({ receipt, onEdit }) {
 
       <div className="flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 pt-3">
         <span className="text-sm font-medium">Total</span>
-        <span className="text-base font-semibold">{formatDin(receipt.totalAmount)}</span>
+        <span className="text-base font-semibold">{formatMoney(receipt.totalAmount, receipt.currency)}</span>
       </div>
       {!addsUp && (
-        <p className="text-xs text-yellow-600 dark:text-yellow-400">Items don't add up to the total ({formatDin(itemsSum)}).</p>
+        <p className="text-xs text-yellow-600 dark:text-yellow-400">Items don't add up to the total ({formatMoney(itemsSum, receipt.currency)}).</p>
       )}
       {!paymentsMatch && (
-        <p className="text-xs text-yellow-600 dark:text-yellow-400">Payments don't add up to the total ({formatDin(paidSum)}).</p>
+        <p className="text-xs text-yellow-600 dark:text-yellow-400">Payments don't add up to the total ({formatMoney(paidSum, receipt.currency)}).</p>
       )}
 
       <button

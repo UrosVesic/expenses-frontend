@@ -34,3 +34,9 @@ export function toLocalInput(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 export const fromLocalInput = (value) => new Date(value).toISOString();
+
+// ISO 4217 codes with an NBS rate, plus RSD; must match montra-api's Currency.SUPPORTED.
+export const CURRENCIES = [
+  "RSD", "EUR", "USD", "CHF", "GBP", "HUF", "BAM", "MKD", "RON", "CZK", "PLN", "DKK",
+  "NOK", "SEK", "TRY", "RUB", "BYN", "AED", "AUD", "CAD", "CNY", "INR", "JPY", "KWD",
+];

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { formatDin } from "./api.js";
+import { formatTotals, useDisplayCurrency } from "./currency.js";
 
 const COLLAPSED_ROWS = 5;
 
 // Ranked list of every group (not just the chart's big slices), with search. Doubles as the
 // chart legend when `colors` (group -> colour) is given. Long lists start collapsed.
 export default function GroupList({ data, selected, onPick, colors, maxHeightClass = "max-h-96" }) {
+  const currency = useDisplayCurrency();
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
   const total = data.reduce((sum, g) => sum + g.totalAmount, 0);
@@ -44,7 +45,7 @@ export default function GroupList({ data, selected, onPick, colors, maxHeightCla
                 <span className="truncate text-zinc-800 dark:text-zinc-200">{g.label ?? g.group}</span>
               </span>
               <span className="shrink-0 flex flex-col items-end leading-tight">
-                <span className="font-medium text-zinc-900 dark:text-white">{formatDin(g.totalAmount)}</span>
+                <span className="font-medium text-zinc-900 dark:text-white">{formatTotals(g.byCurrency, currency)}</span>
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
                   {total > 0 ? ((g.totalAmount / total) * 100).toFixed(1) : 0}%
                   {g.receiptCount != null && ` · ${g.receiptCount} ${g.receiptCount === 1 ? "receipt" : "receipts"}`}
