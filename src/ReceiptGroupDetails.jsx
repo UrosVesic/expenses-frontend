@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { fetchReceipt, formatMoney, requestReceiptPhoto } from "./api.js";
-import { formatTotals, useDisplayCurrency } from "./currency.js";
+import { formatTotalsList, useDisplayCurrency } from "./currency.js";
 import PhotoLightbox from "./PhotoLightbox.jsx";
 import ReceiptDetails from "./ReceiptDetails.jsx";
 import ReceiptEditor from "./ReceiptEditor.jsx";
@@ -351,7 +351,11 @@ export default function ReceiptGroupDetails({ groupName, details, loading, panel
           <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 truncate">{groupName}</h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">{plural(receipts.length, "receipt")}</p>
         </div>
-        <p className="shrink-0 text-lg font-semibold tracking-tight">{formatTotals(details.byCurrency, displayCurrency)}</p>
+        <div className="shrink-0 text-right text-lg font-semibold tracking-tight">
+          {formatTotalsList(details.byCurrency, displayCurrency).map((t) => (
+            <p key={t}>{t}</p>
+          ))}
+        </div>
       </div>
       {sorted.map((receipt, index) => (
         <ReceiptCard key={receipt.id || index} receipt={receipt} onReceiptUpdated={onReceiptUpdated} />

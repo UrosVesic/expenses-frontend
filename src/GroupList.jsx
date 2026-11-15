@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { formatTotals, useDisplayCurrency } from "./currency.js";
+import MoreTotals from "./MoreTotals.jsx";
+import { formatTotalsList, useDisplayCurrency } from "./currency.js";
 
 const COLLAPSED_ROWS = 5;
 
@@ -45,7 +46,10 @@ export default function GroupList({ data, selected, onPick, colors, maxHeightCla
                 <span className="truncate text-zinc-800 dark:text-zinc-200">{g.label ?? g.group}</span>
               </span>
               <span className="shrink-0 flex flex-col items-end leading-tight">
-                <span className="font-medium text-zinc-900 dark:text-white">{formatTotals(g.byCurrency, currency)}</span>
+                <span className="font-medium text-zinc-900 dark:text-white">
+                  {formatTotalsList(g.byCurrency, currency)[0]}
+                  <MoreTotals byCurrency={g.byCurrency} currency={currency} max={1} align="right" className="ml-1 font-normal text-zinc-500 dark:text-zinc-400" />
+                </span>
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
                   {total > 0 ? ((g.totalAmount / total) * 100).toFixed(1) : 0}%
                   {g.receiptCount != null && ` · ${g.receiptCount} ${g.receiptCount === 1 ? "receipt" : "receipts"}`}

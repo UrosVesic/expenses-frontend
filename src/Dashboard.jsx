@@ -9,7 +9,8 @@ import Toast from "./Toast.jsx";
 import MonthPicker from "./MonthPicker.jsx";
 import QrScannerButton from "./QrScanner.jsx";
 import { fetchMonthlyExpenses, updateProfileCurrency } from "./api.js";
-import { DisplayCurrencyContext, formatTotals, sumByCurrency, withShownAmount } from "./currency.js";
+import MoreTotals from "./MoreTotals.jsx";
+import { DisplayCurrencyContext, formatTotalsList, sumByCurrency, withShownAmount } from "./currency.js";
 import { CURRENCIES } from "./receiptOptions.js";
 import { OTHER_KEY, groupDetails, groupExpenses } from "./groups.js";
 
@@ -301,13 +302,19 @@ export default function Dashboard() {
           <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5 lg:mb-8">
             <div className="col-span-2 rounded-2xl p-5 text-white bg-gradient-to-br from-zinc-800 to-zinc-950 dark:from-zinc-700 dark:to-zinc-900 shadow-sm min-w-0">
               <dt className="text-xs font-medium text-zinc-300">Total spent</dt>
-              <dd className="mt-1 text-3xl font-semibold tracking-tight truncate">{formatTotals(totalsByCurrency, currency)}</dd>
+              <dd className="mt-1 font-semibold tracking-tight">
+                {formatTotalsList(totalsByCurrency, currency).slice(0, 2).map((t, i) => (
+                  <div key={t} className={i === 0 ? "text-3xl truncate" : "text-xl text-zinc-300 truncate"}>{t}</div>
+                ))}
+                <MoreTotals byCurrency={totalsByCurrency} currency={currency} max={2} className="mt-1 text-zinc-200" />
+              </dd>
               <p className="mt-2 text-xs text-zinc-300 truncate">
                 Top category: <span className="font-medium text-white">{topCategory ? (topCategory.label ?? topCategory.group) : "-"}</span>
               </p>
             </div>
             <Stat label="Receipts" value={loading ? "…" : totalReceipts} />
-            <Stat label="Average receipt" value={formatTotals(averageByCurrency, currency)} />
+            <Stat label="Average receipt" value={formatTotalsList(averageByCurrency, currency).slice(0, 2)}
+              more={<MoreTotals byCurrency={averageByCurrency} currency={currency} max={2} className="mt-1 text-zinc-500 dark:text-zinc-400" />} />
           </dl>
         )}
 
@@ -391,12 +398,17 @@ function TabButton({ active, onClick, label, children }) {
   );
 }
 
-function Stat({ label, value, small }) {
+function Stat({ label, value, small, more }) {
   return (
     <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm px-4 py-3 sm:px-5 sm:py-4 min-w-0">
       <dt className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{label}</dt>
-      <dd className={`mt-1 font-semibold tracking-tight truncate ${small ? "text-lg leading-8" : "text-xl sm:text-2xl"}`} title={String(value)}>
-        {value}
+      <dd className={`mt-1 font-semibold tracking-tight ${small ? "text-lg leading-8" : "text-xl sm:text-2xl"}`}>
+        {Array.isArray(value)
+          ? value.map((v, i) => (
+              <div key={v} className={`truncate ${i > 0 ? "text-base text-zinc-500 dark:text-zinc-400" : ""}`}>{v}</div>
+            ))
+          : <div className="truncate" title={String(value)}>{value}</div>}
+        {more}
       </dd>
     </div>
   );

@@ -5,7 +5,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { formatTotals, mergeByCurrency, useDisplayCurrency } from "./currency.js";
+import MoreTotals from "./MoreTotals.jsx";
+import { formatTotalsList, mergeByCurrency, useDisplayCurrency } from "./currency.js";
 import { groupSmallSlices } from "./groups.js";
 import GroupList from "./GroupList.jsx";
 
@@ -85,7 +86,14 @@ export default function GroupDoughnutChart({
                 </Pie>
                 <Tooltip
                   isAnimationActive={false}
-                  formatter={(_, name) => [formatTotals(totalsOf(name), currency), labelOf(name)]}
+                  formatter={(_, name) => [
+                    <span className="flex flex-col">
+                      {formatTotalsList(totalsOf(name), currency).map((t) => (
+                        <span key={t}>{t}</span>
+                      ))}
+                    </span>,
+                    labelOf(name),
+                  ]}
                   contentStyle={{
                     background: "var(--bg)",
                     border: "1px solid var(--border)",
@@ -99,7 +107,8 @@ export default function GroupDoughnutChart({
           {!loading && grouped.length > 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-xs text-zinc-500 dark:text-zinc-400">Total</span>
-              <span className="text-lg font-semibold text-center px-10 leading-tight">{formatTotals(totals, currency)}</span>
+              <span className="text-lg font-semibold text-center px-10 leading-tight">{formatTotalsList(totals, currency)[0]}</span>
+              <MoreTotals byCurrency={totals} currency={currency} max={1} align="center" className="mt-1 text-zinc-500 dark:text-zinc-400" />
             </div>
           )}
         </div>

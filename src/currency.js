@@ -31,10 +31,15 @@ export function mergeByCurrency(maps) {
   return sums;
 }
 
-// "5,000 din + €20.00"; the display currency (else RSD) first, then the others alphabetically.
-export function formatTotals(byCurrency, displayCurrency) {
+// ["5,000 din", "€20.00"]; the display currency (else RSD) first, then the others alphabetically.
+export function formatTotalsList(byCurrency, displayCurrency) {
   const first = displayCurrency ?? "RSD";
   const codes = Object.keys(byCurrency).sort((a, b) => (a === first ? -1 : b === first ? 1 : a.localeCompare(b)));
-  if (codes.length === 0) return formatMoney(0, first);
-  return codes.map((c) => formatMoney(byCurrency[c], c)).join(" + ");
+  if (codes.length === 0) return [formatMoney(0, first)];
+  return codes.map((c) => formatMoney(byCurrency[c], c));
+}
+
+// "5,000 din + €20.00", for single-line places.
+export function formatTotals(byCurrency, displayCurrency) {
+  return formatTotalsList(byCurrency, displayCurrency).join(" + ");
 }

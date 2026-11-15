@@ -62,11 +62,26 @@ export function requestReceiptPhoto(idToken, receiptId) {
   return fetchJson(`${API_BASE_URL}/receipts/${encodeURIComponent(receiptId)}/photo`, idToken);
 }
 
+// `npm run local`: the local montra-api has no JWT authorizer and trusts X-User-Id instead,
+// so send the token's `sub` (decoded only, not verified; API Gateway does that in AWS).
+const LOCAL_API = import.meta.env.VITE_API_URL?.startsWith("http://localhost");
+
+function localUserHeaders(idToken) {
+  if (!LOCAL_API) return {};
+  try {
+    const payload = idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return { "X-User-Id": JSON.parse(atob(payload)).sub };
+  } catch {
+    return {};
+  }
+}
+
 export async function fetchJson(url, idToken, options = {}) {
   const res = await fetch(url, {
     ...options,
     headers: {
       Authorization: `Bearer ${idToken}`,
+      ...localUserHeaders(idToken),
       ...options.headers,
     },
   });
