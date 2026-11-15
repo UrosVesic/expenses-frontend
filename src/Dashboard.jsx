@@ -9,6 +9,7 @@ import Toast from "./Toast.jsx";
 import MonthPicker from "./MonthPicker.jsx";
 import QrScannerButton from "./QrScanner.jsx";
 import { fetchMonthlyExpenses, updateProfileCurrency } from "./api.js";
+import { usePullToRefresh } from "./usePullToRefresh.js";
 import MoreTotals from "./MoreTotals.jsx";
 import { DisplayCurrencyContext, formatTotalsList, sumByCurrency, withShownAmount } from "./currency.js";
 import { CURRENCIES } from "./receiptOptions.js";
@@ -105,6 +106,7 @@ export default function Dashboard() {
   // bumped after a receipt is edited so the charts and stats reload
   const [reloadKey, setReloadKey] = useState(0);
   const onReceiptUpdated = () => setReloadKey((k) => k + 1);
+  const { pull, ready } = usePullToRefresh(() => setReloadKey((k) => k + 1));
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -202,6 +204,24 @@ export default function Dashboard() {
     <DisplayCurrencyContext.Provider value={currency}>
     <div className="min-h-dvh bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <Toast toast={toast} onDismiss={() => setToast(null)} />
+      {(pull > 0 || loading) && (
+        <div
+          className="fixed left-1/2 z-50 -translate-x-1/2 pointer-events-none"
+          style={{ top: `calc(env(safe-area-inset-top) + ${loading && !pull ? 64 : 8 + pull}px)` }}
+        >
+          <div className="h-9 w-9 rounded-full bg-white dark:bg-zinc-800 shadow grid place-items-center">
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-5 w-5 text-zinc-600 dark:text-zinc-300 ${loading && !pull ? "animate-spin" : ""}`}
+              style={pull ? { transform: `rotate(${pull * 3}deg)`, opacity: ready ? 1 : 0.5 } : undefined}
+              fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+            >
+              <path d="M21 12a9 9 0 1 1-3-6.7" />
+              <path d="M21 4v5h-5" />
+            </svg>
+          </div>
+        </div>
+      )}
 
       <header className="sticky top-0 z-40 bg-zinc-100/85 dark:bg-zinc-950/85 lg:bg-white/80 lg:dark:bg-zinc-900/80 backdrop-blur border-b border-zinc-200/70 dark:border-zinc-800 pt-[env(safe-area-inset-top)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
