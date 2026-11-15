@@ -204,6 +204,8 @@ function ReceiptCard({ receipt, onReceiptUpdated }) {
   );
 }
 
+const COLLAPSED_RECEIPTS = 5;
+
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 // "VOJIN CUCIC PR KORČAGIN KAFANE" -> "Vojin Cucic PR Korčagin Kafane" (keeps short legal forms upper)
@@ -286,6 +288,8 @@ const ImageIcon = () => (
 
 export default function ReceiptGroupDetails({ groupName, details, loading, panel, onReceiptUpdated }) {
   const displayCurrency = useDisplayCurrency();
+  // long receipt lists start collapsed; remembered per group so picking another one collapses
+  const [expandedFor, setExpandedFor] = useState(null);
   // "Other" slice: list the small groups it contains; picking one loads its receipts
   if (panel?.selected === OTHER_KEY) {
     return (
@@ -333,7 +337,9 @@ export default function ReceiptGroupDetails({ groupName, details, loading, panel
   }
 
   // the API already returns them newest first
-  const sorted = receipts;
+  const collapsible = receipts.length > COLLAPSED_RECEIPTS;
+  const expanded = expandedFor === groupName;
+  const visible = collapsible && !expanded ? receipts.slice(0, COLLAPSED_RECEIPTS) : receipts;
 
   return (
     <div className="space-y-2">
@@ -357,9 +363,20 @@ export default function ReceiptGroupDetails({ groupName, details, loading, panel
           ))}
         </div>
       </div>
-      {sorted.map((receipt, index) => (
-        <ReceiptCard key={receipt.id || index} receipt={receipt} onReceiptUpdated={onReceiptUpdated} />
-      ))}
+      <div className={`space-y-2 ${expanded ? "max-h-[36rem] overflow-y-auto overscroll-contain pr-1" : ""}`}>
+        {visible.map((receipt, index) => (
+          <ReceiptCard key={receipt.id || index} receipt={receipt} onReceiptUpdated={onReceiptUpdated} />
+        ))}
+      </div>
+      {collapsible && (
+        <button
+          type="button"
+          onClick={() => setExpandedFor(expanded ? null : groupName)}
+          className="w-full py-2 text-sm font-medium text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800"
+        >
+          {expanded ? "Show less" : `Show all ${receipts.length}`}
+        </button>
+      )}
     </div>
   );
 }
