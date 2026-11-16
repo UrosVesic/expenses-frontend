@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { fetchReceipt, formatMoney, requestReceiptPhoto } from "./api.js";
 import { formatTotalsList, useDisplayCurrency } from "./currency.js";
@@ -206,6 +206,65 @@ function ReceiptCard({ receipt, onReceiptUpdated }) {
 
 const COLLAPSED_RECEIPTS = 5;
 
+const PHONE_QUERY = "(max-width: 639px)"; // below Tailwind's sm
+
+function useIsPhone() {
+  const [isPhone, setIsPhone] = useState(() => window.matchMedia(PHONE_QUERY).matches);
+  useEffect(() => {
+    const media = window.matchMedia(PHONE_QUERY);
+    const onChange = () => setIsPhone(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+  return isPhone;
+}
+
+// phones: the full receipt list opens as a full-screen sheet (like the editor) instead of a
+// nested scroll box inside the page, so the page itself never gets stuck behind it
+function ReceiptListSheet({ title, totals, receipts, onClose, onReceiptUpdated }) {
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-zinc-100 dark:bg-zinc-950" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="shrink-0 flex items-center gap-3 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="-ml-2 p-2 rounded-full text-zinc-600 dark:text-zinc-300 active:bg-zinc-100 dark:active:bg-zinc-800"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 truncate">{title}</h3>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">{plural(receipts.length, "receipt")}</p>
+        </div>
+        <div className="shrink-0 text-right text-sm font-semibold">
+          {totals.map((t) => (
+            <p key={t}>{t}</p>
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto overscroll-contain p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-2">
+        {receipts.map((receipt, index) => (
+          <ReceiptCard key={receipt.id || index} receipt={receipt} onReceiptUpdated={onReceiptUpdated} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 // "VOJIN CUCIC PR KORČAGIN KAFANE" -> "Vojin Cucic PR Korčagin Kafane" (keeps short legal forms upper)
@@ -290,6 +349,7 @@ export default function ReceiptGroupDetails({ groupName, details, loading, panel
   const displayCurrency = useDisplayCurrency();
   // long receipt lists start collapsed; remembered per group so picking another one collapses
   const [expandedFor, setExpandedFor] = useState(null);
+  const isPhone = useIsPhone();
   // "Other" slice: list the small groups it contains; picking one loads its receipts
   if (panel?.selected === OTHER_KEY) {
     return (
@@ -339,7 +399,10 @@ export default function ReceiptGroupDetails({ groupName, details, loading, panel
   // the API already returns them newest first
   const collapsible = receipts.length > COLLAPSED_RECEIPTS;
   const expanded = expandedFor === groupName;
-  const visible = collapsible && !expanded ? receipts.slice(0, COLLAPSED_RECEIPTS) : receipts;
+  // on phones the inline list stays collapsed; "Show all" opens the sheet instead
+  const showAllInline = expanded && !isPhone;
+  const visible = collapsible && !showAllInline ? receipts.slice(0, COLLAPSED_RECEIPTS) : receipts;
+  const totals = formatTotalsList(details.byCurrency, displayCurrency);
 
   return (
     <div className="space-y-2">
@@ -358,12 +421,12 @@ export default function ReceiptGroupDetails({ groupName, details, loading, panel
           <p className="text-xs text-zinc-500 dark:text-zinc-400">{plural(receipts.length, "receipt")}</p>
         </div>
         <div className="shrink-0 text-right text-lg font-semibold tracking-tight">
-          {formatTotalsList(details.byCurrency, displayCurrency).map((t) => (
+          {totals.map((t) => (
             <p key={t}>{t}</p>
           ))}
         </div>
       </div>
-      <div className={`space-y-2 ${expanded ? "max-h-[36rem] overflow-y-auto overscroll-contain pr-1" : ""}`}>
+      <div className={`space-y-2 ${showAllInline ? "max-h-[36rem] overflow-y-auto overscroll-contain pr-1" : ""}`}>
         {visible.map((receipt, index) => (
           <ReceiptCard key={receipt.id || index} receipt={receipt} onReceiptUpdated={onReceiptUpdated} />
         ))}
@@ -374,8 +437,17 @@ export default function ReceiptGroupDetails({ groupName, details, loading, panel
           onClick={() => setExpandedFor(expanded ? null : groupName)}
           className="w-full py-2 text-sm font-medium text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800"
         >
-          {expanded ? "Show less" : `Show all ${receipts.length}`}
+          {showAllInline ? "Show less" : `Show all ${receipts.length}`}
         </button>
+      )}
+      {expanded && isPhone && (
+        <ReceiptListSheet
+          title={groupName}
+          totals={totals}
+          receipts={receipts}
+          onClose={() => setExpandedFor(null)}
+          onReceiptUpdated={onReceiptUpdated}
+        />
       )}
     </div>
   );

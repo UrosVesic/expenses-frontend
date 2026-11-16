@@ -46,9 +46,9 @@ export default function GroupList({ data, selected, onPick, colors, maxHeightCla
                 <span className="truncate text-zinc-800 dark:text-zinc-200">{g.label ?? g.group}</span>
               </span>
               <span className="shrink-0 flex flex-col items-end leading-tight">
-                <span className="font-medium text-zinc-900 dark:text-white">
-                  {formatTotalsList(g.byCurrency, currency)[0]}
-                  <MoreTotals byCurrency={g.byCurrency} currency={currency} max={1} align="right" className="ml-1 font-normal text-zinc-500 dark:text-zinc-400" />
+                <span className="flex flex-wrap items-center justify-end gap-x-1 gap-y-0.5 font-medium text-zinc-900 dark:text-white">
+                  <span className="whitespace-nowrap">{formatTotalsList(g.byCurrency, currency)[0]}</span>
+                  <MoreTotals byCurrency={g.byCurrency} currency={currency} max={1} align="right" className="font-normal text-zinc-500 dark:text-zinc-400" />
                 </span>
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
                   {total > 0 ? ((g.totalAmount / total) * 100).toFixed(1) : 0}%
