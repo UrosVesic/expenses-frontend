@@ -87,7 +87,14 @@ export async function fetchJson(url, idToken, options = {}) {
   });
 
   if (!res.ok) {
-    const error = new Error(`Request failed with status ${res.status}`);
+    // montra-api errors are ProblemDetail JSON; `detail` is a user-facing message.
+    let detail;
+    try {
+      detail = (await res.json())?.detail;
+    } catch {
+      // not JSON (e.g. an API Gateway or Lambda error)
+    }
+    const error = new Error(detail || `Request failed with status ${res.status}`);
     error.status = res.status;
     throw error;
   }
