@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
-import { fetchReceipt, formatMoney, requestReceiptPhoto } from "./api.js";
+import { fetchReceipt, formatMoney, requestReceiptPhoto, errorMessage } from "./api.js";
 import { formatTotalsList, useDisplayCurrency } from "./currency.js";
 import PhotoLightbox from "./PhotoLightbox.jsx";
 import ReceiptDetails from "./ReceiptDetails.jsx";
@@ -38,8 +38,8 @@ function ReceiptCard({ receipt, onReceiptUpdated }) {
       } else {
         setPhotoUrl(photo.url);
       }
-    } catch {
-      setPhotoError("Couldn't load the photo.");
+    } catch (err) {
+      setPhotoError(errorMessage(err, "Couldn't load the photo."));
     } finally {
       setPhotoLoading(false);
     }
@@ -53,8 +53,8 @@ function ReceiptCard({ receipt, onReceiptUpdated }) {
       const loaded = await fetchReceipt(auth.user?.id_token, receipt.id);
       setFull(loaded);
       return loaded;
-    } catch {
-      setFullError("Couldn't load the receipt.");
+    } catch (err) {
+      setFullError(errorMessage(err, "Couldn't load the receipt."));
       return null;
     } finally {
       setFullLoading(false);

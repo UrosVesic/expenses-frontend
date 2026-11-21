@@ -38,13 +38,25 @@ export function requestUploadUrl(idToken, contentType) {
 // Upload straight to S3. Content-Type and the signed extra headers (x-amz-meta-tz) must match
 // what the URL was signed for; pass the `headers` returned by requestUploadUrl.
 export async function uploadToS3(url, body, contentType, extraHeaders = {}) {
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: { ...extraHeaders, "Content-Type": contentType },
-    body,
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "PUT",
+      headers: { ...extraHeaders, "Content-Type": contentType },
+      body,
+    });
+  } catch {
+    throw new ApiError(NETWORK_MESSAGE, { status: 0, code: "NETWORK" });
+  }
   if (!res.ok) {
-    throw new Error(`S3 upload failed with status ${res.status}`);
+    // 403 from S3 is almost always an expired link (or a type mismatch we can't fix here)
+    const message =
+      res.status === 403
+        ? "The upload link expired. Please try again."
+        : res.status === 400 && /EntityTooLarge/.test(await res.text().catch(() => ""))
+          ? "The file is too large."
+          : `The upload failed (status ${res.status}). Please try again.`;
+    throw new ApiError(message, { status: res.status, code: "UPLOAD_FAILED" });
   }
 }
 
@@ -77,29 +89,71 @@ function localUserHeaders(idToken) {
 }
 
 export async function fetchJson(url, idToken, options = {}) {
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-      ...localUserHeaders(idToken),
-      ...options.headers,
-    },
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        ...localUserHeaders(idToken),
+        ...options.headers,
+      },
+    });
+  } catch {
+    // offline, DNS, CORS (API Gateway answers some errors without CORS headers), aborted
+    throw new ApiError(NETWORK_MESSAGE, { status: 0, code: "NETWORK" });
+  }
 
   if (!res.ok) {
-    // montra-api errors are ProblemDetail JSON; `detail` is a user-facing message.
-    let detail;
+    // montra-api errors are ProblemDetail JSON: `detail` is user-facing, `code` is stable,
+    // `errors` lists invalid fields ([{ field, message }]) for validation failures.
+    let body;
     try {
-      detail = (await res.json())?.detail;
+      body = await res.json();
     } catch {
       // not JSON (e.g. an API Gateway or Lambda error)
     }
-    const error = new Error(detail || `Request failed with status ${res.status}`);
-    error.status = res.status;
-    throw error;
+    if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    throw new ApiError(body?.detail || statusMessage(res.status), {
+      status: res.status,
+      code: body?.code,
+      errors: body?.errors,
+    });
   }
 
   return res.json();
+}
+
+export class ApiError extends Error {
+  constructor(message, { status, code, errors } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.errors = errors ?? [];
+  }
+}
+
+// Fired on any 401; App.jsx refreshes the tokens (or signs out).
+export const UNAUTHORIZED_EVENT = "montra:unauthorized";
+
+const NETWORK_MESSAGE = "Can't reach the server. Check your connection and try again.";
+
+// Used when the response has no ProblemDetail (API Gateway, Lambda timeouts, throttling).
+function statusMessage(status) {
+  if (status === 401) return "Your session expired. Please sign in again.";
+  if (status === 403) return "You don't have access to this.";
+  if (status === 404) return "Not found. It may have been deleted.";
+  if (status === 413) return "The file or request is too large.";
+  if (status === 429) return "Too many requests. Please wait a moment and try again.";
+  if (status === 503 || status === 504) return "The server is busy or timed out. Please try again.";
+  if (status >= 500) return "Something went wrong on our side. Please try again.";
+  return `Request failed (status ${status}).`;
+}
+
+// The message to show for any caught error; `fallback` covers non-API errors (bugs, parsing).
+export function errorMessage(err, fallback = "Something went wrong. Please try again.") {
+  return err instanceof ApiError ? err.message : fallback;
 }
 
 // Dinars without decimals, as before ("1,234 din"); other currencies with two ("€12.50").

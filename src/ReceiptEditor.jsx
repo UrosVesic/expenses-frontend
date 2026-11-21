@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
-import { formatMoney, updateReceipt } from "./api.js";
+import { formatMoney, updateReceipt, errorMessage } from "./api.js";
 import { CURRENCIES } from "./receiptOptions.js";
 import { CATEGORIES, PAYMENT_TYPES, fromLocalInput, toLocalInput } from "./receiptOptions.js";
 
@@ -134,11 +134,9 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
       });
       onSaved(updated);
     } catch (e) {
-      setError(
-        e?.status === 400
-          ? "The server rejected some of the values. Please check them."
-          : "Couldn't save the receipt. Please try again.",
-      );
+      // validation errors list the fields, e.g. "items[2].quantity: must be greater than 0"
+      const fields = (e?.errors ?? []).map((f) => `${fieldLabel(f.field)}: ${f.message}`);
+      setError([errorMessage(e, "Couldn't save the receipt. Please try again."), ...fields].join("\n"));
     } finally {
       setSaving(false);
     }
@@ -391,7 +389,7 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
             total.
           </p>
         )}
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="whitespace-pre-line text-sm text-red-600 dark:text-red-400">{error}</p>}
       </div>
 
       <div className="shrink-0 flex gap-2 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 lg:border-0 lg:bg-transparent lg:dark:bg-transparent lg:justify-end lg:px-3 lg:pb-3">
@@ -414,4 +412,15 @@ export default function ReceiptEditor({ receipt, onSaved, onCancel }) {
       </div>
     </div>
   );
+}
+
+// "items[2].unitPrice" -> "Item 3 unit price"
+function fieldLabel(field) {
+  return field
+    .replace(/items\[(\d+)\]\.?/, (_, i) => `Item ${Number(i) + 1} `)
+    .replace(/payments\[(\d+)\]\.?/, (_, i) => `Payment ${Number(i) + 1} `)
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
 }

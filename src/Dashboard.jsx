@@ -8,7 +8,7 @@ import ReceiptGroupDetails from "./ReceiptGroupDetails.jsx";
 import Toast from "./Toast.jsx";
 import MonthPicker from "./MonthPicker.jsx";
 import QrScannerButton from "./QrScanner.jsx";
-import { fetchMonthlyExpenses, updateProfileCurrency } from "./api.js";
+import { fetchMonthlyExpenses, updateProfileCurrency, errorMessage } from "./api.js";
 import { usePullToRefresh } from "./usePullToRefresh.js";
 import MoreTotals from "./MoreTotals.jsx";
 import { DisplayCurrencyContext, formatTotalsList, sumByCurrency, withShownAmount } from "./currency.js";
@@ -146,8 +146,9 @@ export default function Dashboard() {
       })
       .catch((err) => {
         if (requestId.current !== currentRequest) return;
-        setError(err.message);
-        setToast({ message: "Failed to fetch data. Please try again.", type: "error" });
+        const message = errorMessage(err, "Failed to fetch data. Please try again.");
+        setError(message);
+        setToast({ message, type: "error" });
       })
       .finally(() => {
         if (requestId.current !== currentRequest) return;
@@ -165,9 +166,9 @@ export default function Dashboard() {
     setCurrency(next || null);
     updateProfileCurrency(idToken, next || null)
       .then(() => setReloadKey((k) => k + 1))
-      .catch(() => {
+      .catch((err) => {
         setCurrency(previous);
-        setToast({ message: "Couldn't change the currency. Please try again.", type: "error" });
+        setToast({ message: errorMessage(err, "Couldn't change the currency. Please try again."), type: "error" });
       });
   };
 

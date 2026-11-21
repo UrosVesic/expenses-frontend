@@ -6,6 +6,7 @@ import {
   requestUploadUrl,
   uploadToS3,
   requestDownloadUrl,
+  errorMessage,
 } from "./api.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -65,8 +66,9 @@ export default function ReceiptUpload({ variant = "button", onToast }) {
       onToast?.({ message: "Receipt uploaded. It will appear shortly.", type: "success" });
     } catch (err) {
       setStatus("error");
-      setError(err.message);
-      onToast?.({ message: "Upload failed. Please try again.", type: "error" });
+      const message = errorMessage(err, "Upload failed. Please try again.");
+      setError(message);
+      onToast?.({ message, type: "error" });
     }
   };
 
@@ -81,7 +83,7 @@ export default function ReceiptUpload({ variant = "button", onToast }) {
       link.click();
     } catch (err) {
       setStatus("error");
-      setError(err.message);
+      setError(errorMessage(err, "Couldn't open the file."));
     }
   };
 

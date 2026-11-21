@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import PhotoLightbox from "./PhotoLightbox.jsx";
-import { ATTACHMENT_TYPES, requestAttachmentUpload, uploadToS3 } from "./api.js";
+import { ATTACHMENT_TYPES, requestAttachmentUpload, uploadToS3, errorMessage } from "./api.js";
 
 const BTN =
   "h-20 flex flex-col items-center justify-center gap-1.5 text-sm font-medium rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50";
@@ -38,7 +38,7 @@ export default function AttachPhoto({ idToken, receiptId, onToast }) {
       onToast?.({ message: "Photo attached.", type: "success" });
     } catch (err) {
       setStatus("error");
-      setError(err.message);
+      setError(errorMessage(err, "Couldn't attach the photo. Please try again."));
     }
   };
 

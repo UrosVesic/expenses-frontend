@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 import { SWITCH_ACCOUNT_FLAG } from "./cognito.js";
+import { UNAUTHORIZED_EVENT } from "./api.js";
 
 // same rule as the dashboard: saved choice, else the OS preference
 function applyStoredTheme() {
@@ -44,6 +45,13 @@ function App() {
     }
   }, [canRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // An API call got 401 (token expired while the app was open): refresh, or sign out.
+  useEffect(() => {
+    const onUnauthorized = () => auth.signinSilent().catch(() => auth.removeUser());
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, [auth]);
+
   // coming back from "Switch account": Cognito's session is gone, so go straight
   // to sign-in and make Google show its account chooser
   const idle = !auth.isLoading && !auth.isAuthenticated && !auth.error && !canRefresh;
@@ -62,6 +70,8 @@ function App() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [auth.error]);
+
+  const signInError = signInErrorMessage(auth.error);
 
   if (auth.isLoading || canRefresh || auth.activeNavigator === "signinSilent") {
     return (
@@ -82,10 +92,8 @@ function App() {
           Snap a receipt, see where your money goes.
         </p>
 
-        {auth.error && (
-          <p className="mt-6 text-sm text-red-600 dark:text-red-400">
-            Sign-in failed: {auth.error.message}
-          </p>
+        {signInError && (
+          <p className="mt-6 text-sm text-red-600 dark:text-red-400">{signInError}</p>
         )}
 
         <button
@@ -101,3 +109,16 @@ function App() {
 }
 
 export default App;
+
+// The message for a failed sign-in, or null when the user just needs to sign in again:
+// an expired/revoked refresh token (invalid_grant) or a failed silent renew is not an error to them.
+function signInErrorMessage(error) {
+  if (!error) return null;
+  const code = error.error ?? error.message;
+  if (code === "invalid_grant" || error.source === "signinSilent" || error.source === "renewSilent") return null;
+  if (code === "access_denied") return "Sign-in was cancelled.";
+  if (error.message === "Failed to fetch" || error.message?.includes("Network")) {
+    return "Can't reach the sign-in service. Check your connection and try again.";
+  }
+  return "Sign-in didn't complete. Please try again.";
+}

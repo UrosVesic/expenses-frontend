@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import AttachPhoto from "./AttachPhoto.jsx";
-import { importReceiptFromQr, isSufUrl } from "./api.js";
+import { importReceiptFromQr, isSufUrl, errorMessage } from "./api.js";
 import ReceiptEditor from "./ReceiptEditor.jsx";
 import ReceiptPreview from "./ReceiptPreview.jsx";
 
@@ -317,7 +317,7 @@ function ScannerDialog({ idToken, onToast, onImported, onClose }) {
       .catch(
         (e) =>
           !cancelled &&
-          setImportState({ status: "error", message: e?.message ?? String(e) }),
+          setImportState({ status: "error", message: errorMessage(e, "Couldn't save the receipt. Please try again.") }),
       );
     return () => {
       cancelled = true;
